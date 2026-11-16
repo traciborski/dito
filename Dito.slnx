@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Dito/Dito.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Dito.Tests/Dito.Tests.csproj" />
+  </Folder>
+</Solution>

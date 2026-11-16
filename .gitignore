@@ -1,0 +1,33 @@
+# Build and publish output
+**/bin/
+**/obj/
+artifacts/
+
+# IDE and user-specific state
+.vs/
+*.user
+*.suo
+
+# Test output and diagnostics
+**/TestResults/
+*.trx
+*.coverage
+*.coveragexml
+*.log
+*.dmp
+
+# Clipboard databases, including SQLite journal/WAL/SHM sidecars
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Local credentials and signing keys
+.env
+.env.*
+!.env.example
+*.pfx
+*.p12
+*.snk

@@ -1,0 +1,2 @@
+# Store normalized text in Git; use the CRLF working files required by .editorconfig.
+* text=auto eol=crlf
