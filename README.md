@@ -84,19 +84,19 @@ Running `dotnet test` without a filter also runs that slower performance test.
 
 ### Release process
 
-1. Set `<Version>` in `src\Dito\Dito.csproj` to the new `MAJOR.MINOR.PATCH`.
-   The SDK generates assembly version metadata; there is no `AssemblyInfo.cs`.
-2. Move pending notes from `Unreleased` to `## MAJOR.MINOR.PATCH` in `CHANGELOG.md`.
-   Commit the version, notes, and matching `SPEC.md` changes together and push `main`.
-3. Tag that commit and push the tag, for example:
+1. Move pending notes from `Unreleased` to `## MAJOR.MINOR.PATCH` in `CHANGELOG.md`.
+   Commit the notes and any matching `SPEC.md` changes and push `main`.
+2. Tag that commit and push the tag, for example:
 
    ```powershell
-   git tag -a v0.1.0 -m "Dito 0.1.0"
-   git push origin v0.1.0
+   git tag -a v0.1.1 -m "Dito 0.1.1"
+   git push origin v0.1.1
    ```
 
-The Release workflow verifies the tag and changelog, runs Windows tests, and
-publishes both ZIPs with those release notes. Do not reuse a released version or tag.
+The Release workflow derives the build version from the tag, runs Windows tests,
+and publishes both ZIPs with the matching release notes. There is no project
+version to bump; local builds use the .NET SDK default (`1.0.0`) unless you pass
+`-p:Version=...`. Do not reuse a released version or tag.
 If the tag push did not start a run, dispatch **Release** from `main` and enter the
 existing tag; it builds that tag, not `main`.
 

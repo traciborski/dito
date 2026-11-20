@@ -8,8 +8,8 @@
 - Start manually; one instance per user per Windows session. No startup registration,
   synchronization, encryption, pinning, standalone images, deletion, or automatic pruning.
   Keep all unique entries; 100,000 is a performance target, not a retention limit.
-- Release every application version from a matching Git tag: `v` plus the `Version`
-  in `src\Dito\Dito.csproj`. Use the matching `CHANGELOG.md` section as release notes.
+- Release from a `vMAJOR.MINOR.PATCH` Git tag. The tag sets the build version;
+  the matching `CHANGELOG.md` section supplies release notes.
   Publish self-contained Windows x64 and Arm64 ZIPs; users need neither the .NET SDK
   nor the Desktop Runtime. See `README.md` for release and development commands.
 

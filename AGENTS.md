@@ -101,6 +101,6 @@ mediator, DI container, event bus, plugin system, or speculative image abstracti
 - Measure the specified 100,000-entry workflow before claiming the performance
   target is met. Do not optimize speculatively ahead of measurements.
 - State what changed, what was verified, and any unverified Windows interaction.
-- For a release, update `Version` in `src\Dito\Dito.csproj` and add a matching
-  version section to `CHANGELOG.md` before tagging. Keep assembly version attributes
-  SDK-generated. Do not tag changes that are not ready to publish.
+- For a release, add the matching `CHANGELOG.md` section before tagging. The Git
+  tag sets the release build version; keep assembly version attributes SDK-generated.
+  Do not tag changes that are not ready to publish.
