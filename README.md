@@ -97,6 +97,8 @@ Running `dotnet test` without a filter also runs that slower performance test.
 
 The Release workflow verifies the tag and changelog, runs Windows tests, and
 publishes both ZIPs with those release notes. Do not reuse a released version or tag.
+If the tag push did not start a run, dispatch **Release** from `main` and enter the
+existing tag; it builds that tag, not `main`.
 
 ### Measured 100,000-entry results
 
