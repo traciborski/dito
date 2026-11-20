@@ -9,12 +9,13 @@ internal sealed class FakeClipboard : IClipboardAccess
     public int WriteAttempts { get; private set; }
     public int BusyReads { get; set; }
     public int BusyWrites { get; set; }
-    public string? WrittenText { get; private set; }
+    public ClipboardContent? WrittenContent { get; private set; }
+    public string? WrittenText => WrittenContent?.Text;
     public bool OwnWriteIsCurrent { get; set; } = true;
     public Action? OnRead { get; set; }
-    public ClipboardReadResult ReadResult { get; set; } = new(ClipboardReadStatus.Text, "copied");
+    public ClipboardReadResult ReadResult { get; set; } = new(ClipboardReadStatus.Text, new("copied"));
 
-    public ClipboardReadResult ReadText(uint expectedSequence)
+    public ClipboardReadResult Read(uint expectedSequence)
     {
         ReadAttempts++;
         OnRead?.Invoke();
@@ -23,7 +24,7 @@ internal sealed class FakeClipboard : IClipboardAccess
             : ReadResult;
     }
 
-    public ClipboardWrite? TryWriteText(string text)
+    public ClipboardWrite? TryWrite(ClipboardContent content)
     {
         WriteAttempts++;
         if (WriteAttempts <= BusyWrites)
@@ -31,7 +32,7 @@ internal sealed class FakeClipboard : IClipboardAccess
             return null;
         }
 
-        WrittenText = text;
+        WrittenContent = content;
         return new ClipboardWrite(++SequenceNumber);
     }
 

@@ -78,14 +78,14 @@ internal sealed class CaptureController
     {
         try
         {
-            var text = await _clipboard.ReadAsync(sequence, cancellationToken);
+            var content = await _clipboard.ReadAsync(sequence, cancellationToken);
             if (_paused || _stopping || cancellationToken.IsCancellationRequested ||
-                string.IsNullOrEmpty(text))
+                content is null || content.Text.Length == 0)
             {
                 return;
             }
 
-            EnqueueCapture(text, copiedAt);
+            EnqueueCapture(content, copiedAt);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -102,7 +102,7 @@ internal sealed class CaptureController
         {
             try
             {
-                await _history.RecordCopyAsync(copy.Text, copy.CopiedAt).ConfigureAwait(false);
+                await _history.RecordCopyAsync(copy.Content, copy.CopiedAt).ConfigureAwait(false);
             }
             catch (Exception)
             {
@@ -117,9 +117,9 @@ internal sealed class CaptureController
         }
     }
 
-    private void EnqueueCapture(string text, DateTimeOffset copiedAt)
+    private void EnqueueCapture(ClipboardContent content, DateTimeOffset copiedAt)
     {
-        if (!_pending.Writer.TryWrite(new CapturedText(text, copiedAt)))
+        if (!_pending.Writer.TryWrite(new CapturedText(content, copiedAt)))
         {
             PauseAfterFailure(
                 "History storage could not keep up. Some entries were not saved; capture is paused.");
@@ -140,5 +140,5 @@ internal sealed class CaptureController
         _readCancellation = null;
     }
 
-    private sealed record CapturedText(string Text, DateTimeOffset CopiedAt);
+    private sealed record CapturedText(ClipboardContent Content, DateTimeOffset CopiedAt);
 }

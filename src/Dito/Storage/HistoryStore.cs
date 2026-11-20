@@ -6,7 +6,7 @@ namespace Dito.Storage;
 internal sealed class HistoryStore : IAsyncDisposable
 {
     private const int PageSize = 100;
-    private const int SchemaVersion = 1;
+    private const int SchemaVersion = 2;
 
     private readonly string _databasePath;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -28,8 +28,16 @@ internal sealed class HistoryStore : IAsyncDisposable
         DateTimeOffset copiedAt,
         CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrEmpty(text);
-        return RunAsync(() => RecordCopy(text, copiedAt), cancellationToken);
+        return RecordCopyAsync(new ClipboardContent(text), copiedAt, cancellationToken);
+    }
+
+    public Task<long> RecordCopyAsync(
+        ClipboardContent content,
+        DateTimeOffset copiedAt,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(content.Text);
+        return RunAsync(() => RecordCopy(content, copiedAt), cancellationToken);
     }
 
     public Task<HistoryPage> SearchAsync(
@@ -44,6 +52,11 @@ internal sealed class HistoryStore : IAsyncDisposable
     public Task<string?> ReadTextAsync(long id, CancellationToken cancellationToken = default)
     {
         return RunAsync(() => ReadText(id), cancellationToken);
+    }
+
+    public Task<ClipboardContent?> ReadFormattedAsync(long id, CancellationToken cancellationToken = default)
+    {
+        return RunAsync(() => ReadFormatted(id), cancellationToken);
     }
 
     public async ValueTask DisposeAsync()
@@ -165,27 +178,42 @@ internal sealed class HistoryStore : IAsyncDisposable
             command.ExecuteNonQuery();
         }
 
+        if (version < 2)
+        {
+            command.CommandText = """
+                ALTER TABLE clips ADD COLUMN html BLOB;
+                ALTER TABLE clips ADD COLUMN rtf BLOB;
+                PRAGMA user_version = 2;
+                """;
+            command.ExecuteNonQuery();
+        }
+
         transaction.Commit();
     }
 
-    private long RecordCopy(string text, DateTimeOffset copiedAt)
+    private long RecordCopy(ClipboardContent content, DateTimeOffset copiedAt)
     {
         using var command = Connection.CreateCommand();
         command.CommandText = """
             INSERT INTO clips (
-                text, first_copied_utc_ms, last_copied_utc_ms, copy_order
+                text, first_copied_utc_ms, last_copied_utc_ms, copy_order, html, rtf
             )
             VALUES (
                 $text, $now, $now,
-                (SELECT COALESCE(MAX(copy_order), 0) + 1 FROM clips)
+                (SELECT COALESCE(MAX(copy_order), 0) + 1 FROM clips),
+                $html, $rtf
             )
             ON CONFLICT(text) DO UPDATE SET
                 last_copied_utc_ms = excluded.last_copied_utc_ms,
-                copy_order = excluded.copy_order
+                copy_order = excluded.copy_order,
+                html = excluded.html,
+                rtf = excluded.rtf
             RETURNING id;
             """;
-        command.Parameters.AddWithValue("$text", text);
+        command.Parameters.AddWithValue("$text", content.Text);
         command.Parameters.AddWithValue("$now", copiedAt.ToUnixTimeMilliseconds());
+        command.Parameters.Add("$html", SqliteType.Blob).Value = (object?)content.Html ?? DBNull.Value;
+        command.Parameters.Add("$rtf", SqliteType.Blob).Value = (object?)content.Rtf ?? DBNull.Value;
         return (long)command.ExecuteScalar()!;
     }
 
@@ -250,6 +278,20 @@ internal sealed class HistoryStore : IAsyncDisposable
         command.CommandText = "SELECT text FROM clips WHERE id = $id;";
         command.Parameters.AddWithValue("$id", id);
         return command.ExecuteScalar() as string;
+    }
+
+    private ClipboardContent? ReadFormatted(long id)
+    {
+        using var command = Connection.CreateCommand();
+        command.CommandText = "SELECT text, html, rtf FROM clips WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", id);
+        using var reader = command.ExecuteReader();
+        return reader.Read()
+            ? new ClipboardContent(
+                reader.GetString(0),
+                reader.IsDBNull(1) ? null : reader.GetFieldValue<byte[]>(1),
+                reader.IsDBNull(2) ? null : reader.GetFieldValue<byte[]>(2))
+            : null;
     }
 
     private SqliteConnection Connection =>

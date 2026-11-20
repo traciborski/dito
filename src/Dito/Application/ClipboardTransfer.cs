@@ -8,15 +8,17 @@ internal enum ClipboardReadStatus
     Superseded
 }
 
-internal sealed record ClipboardReadResult(ClipboardReadStatus Status, string? Text = null);
+internal sealed record ClipboardContent(string Text, byte[]? Html = null, byte[]? Rtf = null);
+
+internal sealed record ClipboardReadResult(ClipboardReadStatus Status, ClipboardContent? Content = null);
 
 internal readonly record struct ClipboardWrite(uint Sequence);
 
 internal interface IClipboardAccess
 {
     uint SequenceNumber { get; }
-    ClipboardReadResult ReadText(uint expectedSequence);
-    ClipboardWrite? TryWriteText(string text);
+    ClipboardReadResult Read(uint expectedSequence);
+    ClipboardWrite? TryWrite(ClipboardContent content);
     bool IsCurrentWrite(ClipboardWrite write);
 }
 
@@ -33,7 +35,7 @@ internal sealed class ClipboardTransfer
 
     public uint SequenceNumber => _clipboard.SequenceNumber;
 
-    public async Task<string?> ReadAsync(uint sequence, CancellationToken cancellationToken)
+    public async Task<ClipboardContent?> ReadAsync(uint sequence, CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < Attempts; attempt++)
         {
@@ -43,10 +45,10 @@ internal sealed class ClipboardTransfer
                 return null;
             }
 
-            var result = _clipboard.ReadText(sequence);
+            var result = _clipboard.Read(sequence);
             if (result.Status != ClipboardReadStatus.Busy)
             {
-                return result.Status == ClipboardReadStatus.Text ? result.Text : null;
+                return result.Status == ClipboardReadStatus.Text ? result.Content : null;
             }
 
             await Task.Delay(RetryDelay, cancellationToken);
@@ -55,12 +57,12 @@ internal sealed class ClipboardTransfer
         return null;
     }
 
-    public async Task<ClipboardWrite?> WriteAsync(string text, CancellationToken cancellationToken)
+    public async Task<ClipboardWrite?> WriteAsync(ClipboardContent content, CancellationToken cancellationToken)
     {
         for (var attempt = 0; attempt < Attempts; attempt++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var write = _clipboard.TryWriteText(text);
+            var write = _clipboard.TryWrite(content);
             if (write.HasValue)
             {
                 return write;

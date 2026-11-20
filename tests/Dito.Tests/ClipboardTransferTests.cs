@@ -1,9 +1,26 @@
+using System.Text;
 using Dito.Application;
+using Dito.Windows;
 
 namespace Dito.Tests;
 
 public sealed class ClipboardTransferTests
 {
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void HtmlPayloadKeepsUtf8BytesButNotClipboardPadding(bool nullTerminated)
+    {
+        const string header = "Version:1.0\r\nEndHTML:";
+        const string body = "<b>caf\u00e9</b>";
+        var length = Encoding.UTF8.GetByteCount(header + "000000\r\n" + body);
+        var padding = nullTerminated ? "\0unused" : "unused";
+        var bytes = Encoding.UTF8.GetBytes($"{header}{length:D6}\r\n{body}{padding}");
+
+        Assert.Equal(length, WindowsClipboard.GetHtmlLength(bytes));
+        Assert.Equal(body, Encoding.UTF8.GetString(bytes.AsSpan(0, length))[^body.Length..]);
+    }
+
     [Fact]
     public async Task BusyClipboardIsRetriedWithoutChangingText()
     {
@@ -11,12 +28,12 @@ public sealed class ClipboardTransferTests
         {
             BusyReads = 2,
             BusyWrites = 2,
-            ReadResult = new ClipboardReadResult(ClipboardReadStatus.Text, " \r\noriginal\t ")
+            ReadResult = new ClipboardReadResult(ClipboardReadStatus.Text, new(" \r\noriginal\t "))
         };
         var clipboard = new ClipboardTransfer(access);
 
-        var text = await clipboard.ReadAsync(1, CancellationToken.None);
-        var write = await clipboard.WriteAsync(text!, CancellationToken.None);
+        var content = await clipboard.ReadAsync(1, CancellationToken.None);
+        var write = await clipboard.WriteAsync(content!, CancellationToken.None);
 
         Assert.Equal(" \r\noriginal\t ", access.WrittenText);
         Assert.Equal(3, access.ReadAttempts);
@@ -42,7 +59,7 @@ public sealed class ClipboardTransferTests
     {
         var clipboard = new ClipboardTransfer(new FakeClipboard
         {
-            ReadResult = new ClipboardReadResult((ClipboardReadStatus)status, "must not capture")
+            ReadResult = new ClipboardReadResult((ClipboardReadStatus)status, new("must not capture"))
         });
 
         Assert.Null(await clipboard.ReadAsync(1, CancellationToken.None));
@@ -55,7 +72,7 @@ public sealed class ClipboardTransferTests
         var clipboard = new ClipboardTransfer(access);
 
         Assert.Null(await clipboard.ReadAsync(1, CancellationToken.None));
-        Assert.Null(await clipboard.WriteAsync("text", CancellationToken.None));
+        Assert.Null(await clipboard.WriteAsync(new("text"), CancellationToken.None));
         Assert.InRange(access.ReadAttempts, 1, 10);
         Assert.InRange(access.WriteAttempts, 1, 10);
     }
@@ -76,16 +93,21 @@ public sealed class ClipboardTransferTests
     }
 
     [Fact]
-    public async Task ShutdownDrainsCapturedTextToDisk()
+    public async Task ShutdownDrainsCapturedTextAndFormattingToDisk()
     {
         await using var database = new TestDatabase();
         await database.Store.InitializeAsync();
-        var access = new FakeClipboard();
+        var content = new ClipboardContent("copied", "<b>copied</b>"u8.ToArray(), @"{\rtf1\b copied}"u8.ToArray());
+        var access = new FakeClipboard { ReadResult = new(ClipboardReadStatus.Text, content) };
         var captures = new CaptureController(database.Store, new ClipboardTransfer(access));
         captures.Start();
         captures.ObserveClipboard();
         await captures.StopAsync();
 
-        Assert.Single((await database.Store.SearchAsync("copied")).Items);
+        var entry = Assert.Single((await database.Store.SearchAsync("copied")).Items);
+        var saved = Assert.IsType<ClipboardContent>(await database.Store.ReadFormattedAsync(entry.Id));
+        Assert.Equal(content.Text, saved.Text);
+        Assert.Equal(content.Html, saved.Html);
+        Assert.Equal(content.Rtf, saved.Rtf);
     }
 }

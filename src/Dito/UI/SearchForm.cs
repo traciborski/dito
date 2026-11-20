@@ -8,7 +8,12 @@ internal sealed class SearchForm : Form
     private readonly Font _uiFont = new("Segoe UI", 10);
     private readonly Font _textFont = new("Consolas", 10);
     private readonly TextBox _searchBox = new() { Dock = DockStyle.Fill, PlaceholderText = "Search history..." };
-    private readonly ListBox _results = new() { Dock = DockStyle.Fill, IntegralHeight = false };
+    private readonly ListBox _results = new()
+    {
+        Dock = DockStyle.Fill,
+        IntegralHeight = false,
+        DrawMode = DrawMode.OwnerDrawFixed
+    };
     private readonly TextBox _preview = new()
     {
         Dock = DockStyle.Fill,
@@ -36,7 +41,7 @@ internal sealed class SearchForm : Form
         ConnectEvents();
     }
 
-    public event Action<long, bool>? RecallRequested;
+    public event Action<long, RecallMode>? RecallRequested;
     public event Action? Dismissed;
 
     public void ShowPopup()
@@ -130,9 +135,16 @@ internal sealed class SearchForm : Form
             return true;
         }
 
-        if (!_recalling && (keyData == Keys.Enter || keyData == (Keys.Control | Keys.Enter)))
+        var recallMode = keyData switch
         {
-            RequestRecall(paste: keyData == Keys.Enter);
+            Keys.Enter => RecallMode.PasteText,
+            Keys.Shift | Keys.Enter => RecallMode.PasteFormatted,
+            Keys.Control | Keys.Enter => RecallMode.CopyText,
+            _ => (RecallMode?)null
+        };
+        if (!_recalling && recallMode.HasValue)
+        {
+            RequestRecall(recallMode.Value);
             return true;
         }
 
@@ -206,7 +218,7 @@ internal sealed class SearchForm : Form
         layout.Controls.Add(_status, 0, 3);
         layout.Controls.Add(new Label
         {
-            Text = "Enter: paste   Ctrl+Enter: copy   PgUp/PgDn: pages   Esc: close",
+            Text = "Enter: text   Shift+Enter: formatted   Ctrl+Enter: copy   PgUp/PgDn   Esc",
             AutoSize = true,
             ForeColor = SystemColors.GrayText
         }, 0, 4);
@@ -218,6 +230,9 @@ internal sealed class SearchForm : Form
         _searchBox.TextChanged += OnQueryChanged;
         _results.SelectedIndexChanged += OnSelectionChanged;
         _results.MouseDoubleClick += OnResultDoubleClick;
+        _results.DrawItem += OnDrawResult;
+        _results.HandleCreated += (_, _) => UpdateResultRowHeight();
+        _results.DpiChangedAfterParent += (_, _) => UpdateResultRowHeight();
         _results.Format += OnFormatResult;
         _results.FormattingEnabled = true;
         _newer.Click += OnNewerClicked;
@@ -273,11 +288,11 @@ internal sealed class SearchForm : Form
         }
     }
 
-    private void RequestRecall(bool paste)
+    private void RequestRecall(RecallMode mode)
     {
         if (_results.SelectedItem is HistoryListItem item)
         {
-            RecallRequested?.Invoke(item.Id, paste);
+            RecallRequested?.Invoke(item.Id, mode);
         }
     }
 
@@ -312,7 +327,7 @@ internal sealed class SearchForm : Form
         if (!_recalling && e.Button == MouseButtons.Left && index >= 0)
         {
             _results.SelectedIndex = index;
-            RequestRecall(paste: true);
+            RequestRecall(RecallMode.PasteText);
         }
     }
 
@@ -355,7 +370,7 @@ internal sealed class SearchForm : Form
         _older.Enabled = !_recalling && _canLoadOlder;
         ShowStatus(results.Items.Count == 0
             ? string.IsNullOrWhiteSpace(_searchBox.Text) ? "No clipboard history yet." : "No matches."
-            : $"{results.Items.Count} entries on this page, newest first.");
+            : "");
         if (_results.Items.Count > 0)
         {
             _results.SelectedIndex = 0;
@@ -371,10 +386,52 @@ internal sealed class SearchForm : Form
     {
         if (e.ListItem is HistoryListItem item)
         {
-            var preview = string.IsNullOrWhiteSpace(item.Preview)
+            e.Value = string.IsNullOrWhiteSpace(item.Preview)
                 ? "[Whitespace]"
                 : item.Preview.Replace("\r\n", " | ").Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ');
-            e.Value = $"{item.LastCopiedAt.LocalDateTime:yyyy-MM-dd HH:mm}  {preview}";
         }
+    }
+
+    private void UpdateResultRowHeight()
+    {
+        using var graphics = _results.CreateGraphics();
+        _results.ItemHeight = (int)Math.Ceiling(_results.Font.GetHeight(graphics)) + _results.LogicalToDeviceUnits(4);
+    }
+
+    private void OnDrawResult(object? sender, DrawItemEventArgs e)
+    {
+        if (e.Index < 0 || e.Index >= _results.Items.Count)
+        {
+            return;
+        }
+
+        var selected = (e.State & DrawItemState.Selected) != 0;
+        var background = selected ? SystemColors.Highlight : ResultRowBackground(e.Index);
+        var foreground = selected ? SystemColors.HighlightText
+            : _results.Enabled ? _results.ForeColor : SystemColors.GrayText;
+        using var brush = new SolidBrush(background);
+        e.Graphics.FillRectangle(brush, e.Bounds);
+        TextRenderer.DrawText(e.Graphics, _results.GetItemText(_results.Items[e.Index]), _results.Font,
+            e.Bounds, foreground, TextFormatFlags.SingleLine | TextFormatFlags.VerticalCenter |
+            TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+        if ((e.State & (DrawItemState.Focus | DrawItemState.NoFocusRect)) == DrawItemState.Focus)
+        {
+            ControlPaint.DrawFocusRectangle(e.Graphics, e.Bounds, foreground, background);
+        }
+    }
+
+    private Color ResultRowBackground(int index)
+    {
+        var background = _results.BackColor;
+        if (index % 2 == 0 || SystemInformation.HighContrast)
+        {
+            return background;
+        }
+
+        var foreground = _results.ForeColor;
+        return Color.FromArgb(
+            (15 * background.R + foreground.R) / 16,
+            (15 * background.G + foreground.G) / 16,
+            (15 * background.B + foreground.B) / 16);
     }
 }

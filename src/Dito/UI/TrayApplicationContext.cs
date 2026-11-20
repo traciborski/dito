@@ -16,6 +16,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly SearchForm _form;
     private readonly Control _dispatcher = new();
     private readonly ContextMenuStrip _menu = new();
+    private readonly Icon _icon;
     private readonly NotifyIcon _tray;
     private readonly ToolStripMenuItem _show;
     private readonly ToolStripMenuItem _pause;
@@ -43,7 +44,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _search = search;
         _recall = recall;
         _paste = paste;
-        _form = new SearchForm(search);
+        using var iconStream = typeof(TrayApplicationContext).Assembly.GetManifestResourceStream("Dito.ico")!;
+        _icon = new Icon(iconStream);
+        _form = new SearchForm(search) { Icon = _icon };
         _show = new ToolStripMenuItem("Show History (Ctrl+`)", null, OnShowRequested) { Enabled = false };
         _pause = new ToolStripMenuItem("Pause Capture", null, OnPauseRequested) { Enabled = false };
         _menu.Items.AddRange([
@@ -52,7 +55,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         ]);
         _tray = new NotifyIcon
         {
-            Icon = SystemIcons.Application,
+            Icon = _icon,
             Text = "Dito - starting",
             ContextMenuStrip = _menu,
             Visible = true
@@ -76,6 +79,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _search.Dispose();
             _form.Dispose();
             _tray.Dispose();
+            _icon.Dispose();
             _menu.Dispose();
             _dispatcher.Dispose();
             _lifetime.Dispose();
@@ -182,15 +186,15 @@ internal sealed class TrayApplicationContext : ApplicationContext
         Dispatch(() => Notify(message));
     }
 
-    private void OnRecallRequested(long entryId, bool paste)
+    private void OnRecallRequested(long entryId, RecallMode mode)
     {
         if (!_recalling && !_shuttingDown)
         {
-            _recallTask = RecallAsync(entryId, paste);
+            _recallTask = RecallAsync(entryId, mode);
         }
     }
 
-    private async Task RecallAsync(long entryId, bool paste)
+    private async Task RecallAsync(long entryId, RecallMode mode)
     {
         if (_recalling || _shuttingDown)
         {
@@ -204,7 +208,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         try
         {
             var result = await _recall.RecallAsync(
-                entryId, _target, paste, _form.HideForRecall, cancellation.Token);
+                entryId, _target, mode, _form.HideForRecall, cancellation.Token);
             if (!cancellation.IsCancellationRequested)
             {
                 ShowRecallResult(result);

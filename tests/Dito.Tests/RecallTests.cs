@@ -10,7 +10,8 @@ public sealed class RecallTests
         await using var database = new TestDatabase();
         await database.Store.InitializeAsync();
         const string text = "  original\r\nsecond line\t ";
-        var id = await database.Store.RecordCopyAsync(text, DateTimeOffset.UtcNow);
+        var id = await database.Store.RecordCopyAsync(
+            new ClipboardContent(text, "<b>original</b>"u8.ToArray()), DateTimeOffset.UtcNow);
         var newestId = await database.Store.RecordCopyAsync("newer", DateTimeOffset.UtcNow);
         var access = new FakeClipboard();
         var desktop = new FakeDesktop();
@@ -18,11 +19,12 @@ public sealed class RecallTests
         var dismissed = false;
 
         var result = await recall.RecallAsync(
-            id, desktop.Target, paste: false, () => dismissed = true, CancellationToken.None);
+            id, desktop.Target, RecallMode.CopyText, () => dismissed = true, CancellationToken.None);
 
         Assert.Equal(RecallResult.Copied, result);
         Assert.True(dismissed);
         Assert.Equal(text, access.WrittenText);
+        Assert.Null(access.WrittenContent!.Html);
         Assert.Equal(0, desktop.PasteAttempts);
         Assert.Equal(newestId, (await database.Store.SearchAsync("")).Items[0].Id);
     }
@@ -38,7 +40,7 @@ public sealed class RecallTests
         var dismissed = false;
 
         var result = await CreateRecall(database, access, desktop).RecallAsync(
-            id, desktop.Target, paste: true, () => dismissed = true, CancellationToken.None);
+            id, desktop.Target, RecallMode.PasteText, () => dismissed = true, CancellationToken.None);
 
         Assert.Equal(RecallResult.ClipboardBusy, result);
         Assert.False(dismissed);
@@ -56,26 +58,39 @@ public sealed class RecallTests
         var desktop = new FakeDesktop();
 
         var result = await CreateRecall(database, access, desktop).RecallAsync(
-            id, null, paste: true, () => { }, CancellationToken.None);
+            id, null, RecallMode.PasteFormatted, () => { }, CancellationToken.None);
 
         Assert.Equal(RecallResult.ManualPaste, result);
         Assert.Equal("selected", access.WrittenText);
+        Assert.Null(access.WrittenContent!.Html);
+        Assert.Null(access.WrittenContent.Rtf);
         Assert.Equal(0, desktop.PasteAttempts);
     }
 
-    [Fact]
-    public async Task SuccessfulPasteHappensAfterCopyAndDismiss()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SuccessfulPastePublishesOnlyRequestedFormatsBeforeDismissing(bool formatted)
     {
         await using var database = new TestDatabase();
         await database.Store.InitializeAsync();
-        var id = await database.Store.RecordCopyAsync("selected", DateTimeOffset.UtcNow);
+        var content = new ClipboardContent("selected", "<b>selected</b>"u8.ToArray(), @"{\rtf1\b selected}"u8.ToArray());
+        var id = await database.Store.RecordCopyAsync(content, DateTimeOffset.UtcNow);
         var access = new FakeClipboard();
         var desktop = new FakeDesktop();
         var dismissed = false;
-        desktop.OnPaste = () => Assert.True(dismissed && access.WrittenText == "selected");
+        desktop.OnPaste = () =>
+        {
+            Assert.True(dismissed);
+            var written = Assert.IsType<ClipboardContent>(access.WrittenContent);
+            Assert.Equal(content.Text, written.Text);
+            Assert.Equal(formatted ? content.Html : null, written.Html);
+            Assert.Equal(formatted ? content.Rtf : null, written.Rtf);
+        };
 
         var result = await CreateRecall(database, access, desktop).RecallAsync(
-            id, desktop.Target, paste: true, () => dismissed = true, CancellationToken.None);
+            id, desktop.Target, formatted ? RecallMode.PasteFormatted : RecallMode.PasteText,
+            () => dismissed = true, CancellationToken.None);
 
         Assert.Equal(RecallResult.Pasted, result);
         Assert.Equal(1, desktop.PasteAttempts);
@@ -91,7 +106,7 @@ public sealed class RecallTests
         var desktop = new FakeDesktop();
 
         var result = await CreateRecall(database, access, desktop).RecallAsync(
-            id, desktop.Target, paste: true, () => access.SequenceNumber++, CancellationToken.None);
+            id, desktop.Target, RecallMode.PasteText, () => access.SequenceNumber++, CancellationToken.None);
 
         Assert.Equal(RecallResult.ClipboardChanged, result);
         Assert.Equal(1, access.WriteAttempts);

@@ -2,8 +2,12 @@
 
 ## Scope and source of truth
 
-- Read `SPEC.md` before implementing or changing behavior. It records the agreed
-  first-version scope; do not silently broaden it.
+- Read `SPEC.md` before changing behavior; it is the compact contract for what
+  actually ships. Do not silently broaden scope or describe planned features as shipped.
+- In the same change, update `SPEC.md` for approved changes to behavior, storage,
+  platform support, or distribution. Before handoff, check the diff against the spec
+  and keep affected README and release notes in sync. Omit implementation examples
+  already maintained in code; keep pending release notes under `Unreleased`.
 - Implementation lives in `src\Dito`; focused tests live in `tests\Dito.Tests`.
 - Favor the simplest complete implementation. Make small, coherent changes and
   verify each working increment.
@@ -77,7 +81,7 @@ mediator, DI container, event bus, plugin system, or speculative image abstracti
 - Use `Microsoft.Data.Sqlite` with FTS5 support and pin a compatible stable version.
   Prefer framework APIs for everything else unless a dependency solves a concrete
   requirement.
-- Do not build generic infrastructure for possible future features. Images,
+- Do not build generic infrastructure for possible future features. Standalone images,
   encryption, startup registration, and deletion are outside the current scope.
 - No capture-count cap, expiry, automatic pruning, or Clear History command.
 - Do not claim that locally written software or unencrypted local storage is
@@ -96,5 +100,7 @@ mediator, DI container, event bus, plugin system, or speculative image abstracti
   is configured. Do not install extra tooling merely to validate Markdown.
 - Measure the specified 100,000-entry workflow before claiming the performance
   target is met. Do not optimize speculatively ahead of measurements.
-- Update the specification for approved behavioral changes. State what was changed,
-  what was verified, and any unverified Windows interaction or remaining limitation.
+- State what changed, what was verified, and any unverified Windows interaction.
+- For a release, update `Version` in `src\Dito\Dito.csproj` and add a matching
+  version section to `CHANGELOG.md` before tagging. Keep assembly version attributes
+  SDK-generated. Do not tag changes that are not ready to publish.

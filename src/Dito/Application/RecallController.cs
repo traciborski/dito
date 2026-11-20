@@ -2,6 +2,13 @@ using Dito.Storage;
 
 namespace Dito.Application;
 
+internal enum RecallMode
+{
+    CopyText,
+    PasteText,
+    PasteFormatted
+}
+
 internal enum RecallResult
 {
     Pasted,
@@ -28,17 +35,17 @@ internal sealed class RecallController
     public async Task<RecallResult> RecallAsync(
         long entryId,
         PasteTarget? target,
-        bool paste,
+        RecallMode mode,
         Action dismissPopup,
         CancellationToken cancellationToken)
     {
-        var text = await _history.ReadTextAsync(entryId, cancellationToken);
-        if (text is null)
+        var content = await LoadContentAsync(entryId, mode, cancellationToken);
+        if (content is null)
         {
             return RecallResult.EntryMissing;
         }
 
-        var write = await _clipboard.WriteAsync(text, cancellationToken);
+        var write = await _clipboard.WriteAsync(content, cancellationToken);
         if (!write.HasValue)
         {
             return RecallResult.ClipboardBusy;
@@ -46,7 +53,7 @@ internal sealed class RecallController
 
         cancellationToken.ThrowIfCancellationRequested();
         dismissPopup();
-        if (!paste)
+        if (mode == RecallMode.CopyText)
         {
             return RecallResult.Copied;
         }
@@ -61,5 +68,17 @@ internal sealed class RecallController
         return _clipboard.IsCurrentWrite(write.Value)
             ? RecallResult.ManualPaste
             : RecallResult.ClipboardChanged;
+    }
+
+    private async Task<ClipboardContent?> LoadContentAsync(
+        long entryId, RecallMode mode, CancellationToken cancellationToken)
+    {
+        if (mode == RecallMode.PasteFormatted)
+        {
+            return await _history.ReadFormattedAsync(entryId, cancellationToken);
+        }
+
+        var text = await _history.ReadTextAsync(entryId, cancellationToken);
+        return text is null ? null : new ClipboardContent(text);
     }
 }

@@ -1,3 +1,4 @@
+using Dito.Application;
 using Dito.Storage;
 
 namespace Dito.Tests;
@@ -152,6 +153,68 @@ public sealed class HistoryStoreTests
     }
 
     [Fact]
+    public async Task FormattedRecopiesReplacePreviousFormatsAndPreserveIdentityAfterReopening()
+    {
+        await using var database = new TestDatabase();
+        await database.Store.InitializeAsync();
+        var now = DateTimeOffset.UtcNow;
+        var id = await database.Store.RecordCopyAsync(new ClipboardContent("original", "<b>original</b>"u8.ToArray()), now);
+        var rtf = @"{\rtf1\i original}"u8.ToArray();
+        Assert.Equal(id, await database.Store.RecordCopyAsync(new ClipboardContent("original", Rtf: rtf), now));
+        await database.Store.DisposeAsync();
+
+        await using var reopened = new HistoryStore(database.Path);
+        await reopened.InitializeAsync();
+        var saved = Assert.IsType<ClipboardContent>(await reopened.ReadFormattedAsync(id));
+        Assert.Equal("original", saved.Text);
+        Assert.Null(saved.Html);
+        Assert.Equal(rtf, saved.Rtf);
+        Assert.Equal(id, Assert.Single((await reopened.SearchAsync("original")).Items).Id);
+
+        Assert.Equal(id, await reopened.RecordCopyAsync("original", now));
+        Assert.Equal(new ClipboardContent("original"), await reopened.ReadFormattedAsync(id));
+    }
+
+    [Fact]
+    public async Task MigratingVersionOneKeepsExistingEntriesSearchableAndAvailableAsPlainText()
+    {
+        await using var database = new TestDatabase();
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(database.Path)!);
+        using (var connection = database.OpenConnection())
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = """
+                CREATE TABLE clips (
+                    id INTEGER PRIMARY KEY,
+                    text TEXT NOT NULL COLLATE BINARY UNIQUE,
+                    first_copied_utc_ms INTEGER NOT NULL,
+                    last_copied_utc_ms INTEGER NOT NULL,
+                    copy_order INTEGER NOT NULL
+                );
+                CREATE UNIQUE INDEX clips_recent ON clips(copy_order);
+                CREATE VIRTUAL TABLE clips_fts USING fts5(
+                    text, content = 'clips', content_rowid = 'id', tokenize = 'unicode61', prefix = '2 3 4'
+                );
+                CREATE TRIGGER clips_after_insert AFTER INSERT ON clips BEGIN
+                    INSERT INTO clips_fts(rowid, text) VALUES (new.id, new.text);
+                END;
+                INSERT INTO clips VALUES (42, 'saved history', 1000, 1000, 1);
+                PRAGMA user_version = 1;
+                """;
+            command.ExecuteNonQuery();
+        }
+
+        await database.Store.InitializeAsync();
+
+        Assert.Equal(42, Assert.Single((await database.Store.SearchAsync("saved hist")).Items).Id);
+        Assert.Equal(new ClipboardContent("saved history"), await database.Store.ReadFormattedAsync(42));
+        var html = "<b>new entry</b>"u8.ToArray();
+        var id = await database.Store.RecordCopyAsync(new ClipboardContent("new entry", html), DateTimeOffset.UtcNow);
+        Assert.Equal(id, Assert.Single((await database.Store.SearchAsync("new entry")).Items).Id);
+        Assert.Equal(html, (await database.Store.ReadFormattedAsync(id))!.Html);
+    }
+
+    [Fact]
     public async Task NewerSchemaIsRejectedWithoutReplacingExistingData()
     {
         await using var database = new TestDatabase();
@@ -162,7 +225,7 @@ public sealed class HistoryStoreTests
             command.CommandText = """
                 CREATE TABLE sentinel (value TEXT);
                 INSERT INTO sentinel VALUES ('keep');
-                PRAGMA user_version = 2;
+                PRAGMA user_version = 3;
                 """;
             command.ExecuteNonQuery();
         }
