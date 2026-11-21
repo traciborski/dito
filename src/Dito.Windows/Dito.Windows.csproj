@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Dito.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Dito</RootNamespace>
+    <AssemblyName>Dito</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Dito.ico" LogicalName="Dito.ico" />
+    <InternalsVisibleTo Include="Dito.Windows.Tests" />
+    <ProjectReference Include="..\Dito\Dito.csproj" />
+  </ItemGroup>
+
+</Project>

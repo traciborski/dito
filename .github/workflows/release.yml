@@ -48,33 +48,76 @@ jobs:
 
       - name: Test release build
         shell: pwsh
-        run: dotnet test .\Dito.slnx -c Release "-p:Version=$env:RELEASE_VERSION" --filter "Category!=Performance"
+        run: |
+          foreach ($project in 'Dito.Tests', 'Dito.Windows.Tests') {
+            dotnet test ".\tests\$project\$project.csproj" -c Release "-p:Version=$env:RELEASE_VERSION" --filter "Category!=Performance"
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Publish self-contained Windows archives
         shell: pwsh
         run: |
           foreach ($rid in 'win-x64', 'win-arm64') {
             $publishDir = ".\publish\$rid"
-            dotnet publish .\src\Dito\Dito.csproj -c Release -r $rid --self-contained true "-p:Version=$env:RELEASE_VERSION" -o $publishDir
+            dotnet publish .\src\Dito.Windows\Dito.Windows.csproj -c Release -r $rid --self-contained true "-p:Version=$env:RELEASE_VERSION" -o $publishDir
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
             Compress-Archive -Path "$publishDir\*" -DestinationPath ".\release\Dito-$env:RELEASE_TAG-$rid.zip"
           }
 
       - uses: actions/upload-artifact@v4
         with:
-          name: release-files
+          name: release-windows
+          path: release/
+          if-no-files-found: error
+
+  package-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ env.RELEASE_TAG }}
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Validate tag
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo 'Release tags must be vMAJOR.MINOR.PATCH.' >&2
+            exit 1
+          fi
+          echo "RELEASE_VERSION=${RELEASE_TAG#v}" >> "$GITHUB_ENV"
+
+      - name: Test release build
+        run: |
+          dotnet test tests/Dito.Tests -c Release "-p:Version=$RELEASE_VERSION" --filter "Category!=Performance"
+          dotnet test tests/Dito.Linux.Tests -c Release "-p:Version=$RELEASE_VERSION"
+
+      - name: Publish self-contained Linux archives
+        run: |
+          mkdir -p release
+          for rid in linux-x64 linux-arm64; do
+            dotnet publish src/Dito.Linux -c Release -r "$rid" --self-contained true \
+              "-p:Version=$RELEASE_VERSION" -o "publish/$rid"
+            tar -czf "release/Dito-$RELEASE_TAG-$rid.tar.gz" -C "publish/$rid" .
+          done
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-linux
           path: release/
           if-no-files-found: error
 
   release:
-    needs: package
+    needs: [package, package-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/download-artifact@v5
         with:
-          name: release-files
+          pattern: release-*
+          merge-multiple: true
 
       - name: Publish GitHub release
         env:
@@ -83,4 +126,5 @@ jobs:
           gh release create "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "Dito $RELEASE_TAG" --notes-file notes.md \
-            "Dito-$RELEASE_TAG-win-x64.zip" "Dito-$RELEASE_TAG-win-arm64.zip"
+            "Dito-$RELEASE_TAG-win-x64.zip" "Dito-$RELEASE_TAG-win-arm64.zip" \
+            "Dito-$RELEASE_TAG-linux-x64.tar.gz" "Dito-$RELEASE_TAG-linux-arm64.tar.gz"

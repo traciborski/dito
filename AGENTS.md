@@ -8,11 +8,13 @@
   platform support, or distribution. Before handoff, check the diff against the spec
   and keep affected README and release notes in sync. Omit implementation examples
   already maintained in code; keep pending release notes under `Unreleased`.
-- Implementation lives in `src\Dito`; focused tests live in `tests\Dito.Tests`.
+- Implementation lives in `src\Dito` (platform-neutral core), `src\Dito.Windows`
+  (WinForms and Win32), and `src\Dito.Linux` (Avalonia and X11). Tests live in
+  the matching `tests\Dito*.Tests` projects.
 - Favor the simplest complete implementation. Make small, coherent changes and
   verify each working increment.
-- Keep one production WinForms project. A separate test project is appropriate;
-  separate production assemblies are not currently needed.
+- Keep the core free of UI and OS references. Each platform gets one frontend
+  project (`Dito.Windows` or `Dito.Linux`).
 
 ## Abstraction and responsibility
 
@@ -24,7 +26,7 @@ abstraction layers, not just files.**
 - An application operation coordinates named capture/search/recall operations; it
   does not know SQL syntax, HWND message constants, or control layout.
 - Storage methods own SQL, transactions, connection lifetimes, and row mapping.
-- Windows integration methods own native handles, clipboard access, hotkey
+- Platform integration methods own native handles, clipboard access, hotkey
   registration, focus checks, and input injection.
 - UI methods own controls, rendering, selection, and user-facing feedback.
 - Keep pure transformations, such as FTS query construction, separate from I/O.
@@ -39,7 +41,8 @@ mediator, DI container, event bus, plugin system, or speculative image abstracti
 
 ## C# conventions
 
-- Target .NET 10 LTS and WinForms; enable nullable reference types and implicit usings.
+- Target .NET 10 LTS; use WinForms on Windows and Avalonia on Linux. Enable nullable
+  reference types and implicit usings.
 - Use standard C# naming: PascalCase types/methods/properties, camelCase parameters
   and locals, `_camelCase` private instance fields. Name asynchronous methods `Async`.
 - Use four-space indentation, braces on separate lines, and file-scoped namespaces.
@@ -57,8 +60,8 @@ mediator, DI container, event bus, plugin system, or speculative image abstracti
 ## Correctness boundaries
 
 - Preserve original text exactly. Truncation and newline flattening are display-only.
-- Keep clipboard operations on an STA/message-loop thread; marshal UI updates onto
-  the WinForms thread. Never block that thread with database work or sleeps.
+- Keep clipboard operations on the desktop message-loop thread (STA on Windows);
+  marshal UI updates there. Never block it with database work or sleeps.
 - Do not assume a method is nonblocking just because its name ends in `Async`.
 - Own database connections explicitly; do not share one across concurrent operations.
   Keep SQL parameterized and FTS syntax safely constructed as well as parameterized.
@@ -94,13 +97,13 @@ mediator, DI container, event bus, plugin system, or speculative image abstracti
 - Test text preservation, deduplication/recency, persistence, FTS escaping and word
   matching, and pagination. Avoid tests that only assert constants or trivial getters.
 - Do not use the live clipboard or send keystrokes in routine automated tests.
-  Verify Windows-specific interaction deliberately and report manual checks honestly.
+  Verify platform-specific interaction deliberately and report manual checks honestly.
 - Once project files exist, run the relevant build/tests and the repository's
   formatter checks. Use `dotnet format --verify-no-changes` if no other formatter
   is configured. Do not install extra tooling merely to validate Markdown.
 - Measure the specified 100,000-entry workflow before claiming the performance
   target is met. Do not optimize speculatively ahead of measurements.
-- State what changed, what was verified, and any unverified Windows interaction.
+- State what changed, what was verified, and any unverified desktop interaction.
 - For a release, add the matching `CHANGELOG.md` section before tagging. The Git
   tag sets the release build version; keep assembly version attributes SDK-generated.
   Do not tag changes that are not ready to publish.

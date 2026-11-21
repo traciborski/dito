@@ -1,8 +1,12 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Dito/Dito.csproj" />
+    <Project Path="src/Dito.Linux/Dito.Linux.csproj" />
+    <Project Path="src/Dito.Windows/Dito.Windows.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Dito.Tests/Dito.Tests.csproj" />
+    <Project Path="tests/Dito.Linux.Tests/Dito.Linux.Tests.csproj" />
+    <Project Path="tests/Dito.Windows.Tests/Dito.Windows.Tests.csproj" />
   </Folder>
 </Solution>

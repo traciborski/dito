@@ -1,20 +1,21 @@
 # Dito
 
-A small, local Windows clipboard history app: WinForms, .NET 10, and SQLite FTS5.
-Persistent text history with optional HTML/RTF formatting, exact-text
-deduplication, and no history-count limit.
+A small, local clipboard history app for Windows 11 and native Linux X11 sessions.
+Both apps use .NET 10 and SQLite FTS5 for persistent text history, exact-text
+deduplication, and search. Windows also captures optional HTML/RTF formatting.
 
 ## Install and run
+
+### Windows
 
 Download the self-contained ZIP for your Windows 11 PC from
 [GitHub Releases](https://github.com/traciborski/dito/releases): `win-x64` for most
 Intel/AMD PCs or `win-arm64` for Arm PCs. Extract the whole ZIP and run `Dito.exe`.
-No SDK, Desktop Runtime, or installer is needed. macOS and Linux (including Fedora
-and Ubuntu) are not supported.
+No SDK, Desktop Runtime, or installer is needed.
 
 The app starts in the notification area. Copy some text, then press
 **Ctrl + the backtick/tilde key, without Shift**. The shortcut is defined centrally
-in `src\Dito\Windows\MessageWindow.cs`. If another app owns it, use the tray icon
+in `src\Dito.Windows\Windows\MessageWindow.cs`. If another app owns it, use the tray icon
 to open history.
 
 Type to search. All words must match; the last word can be a prefix. Search is
@@ -42,10 +43,33 @@ manual Ctrl+V. If another app changes the clipboard during recall, automatic pas
 is canceled instead of overwriting that newer copy. Opening from the tray may not
 provide a usable target; the keyboard shortcut is the primary recall workflow.
 
+### Linux (native X11)
+
+Use a native X11 session (`echo "$XDG_SESSION_TYPE"` should print `x11`).
+**Wayland and XWayland are not supported**, including GNOME Wayland. Select the
+`linux-x64` or `linux-arm64` tar.gz, extract the whole archive, and run `./Dito.Linux`.
+The archive includes .NET and SQLite. It still needs your distro's desktop
+libraries (X11 with XFixes, fontconfig, and standard .NET system dependencies).
+The same app is used across distros; compatibility has not been verified
+across every distro and window manager.
+
+Copy text in another app, then open history from the tray or by running
+`/absolute/path/to/Dito.Linux --show`. Set that command as a custom keyboard
+shortcut in your desktop settings. Search, use Up/Down and PageUp/PageDown to
+navigate, and press Enter or Ctrl+Enter to copy the original plain text and hide
+history. Paste manually in the destination app. Keep Dito running until you've
+pasted; X11 clipboard data may not persist after Dito exits.
+
+Escape and closing the window hide it. The tray requires StatusNotifierItem
+support; use the window's **Pause Capture** and **Exit** buttons if the tray icon
+is unavailable. There is no automatic paste, formatted capture or recall, or
+automatic startup registration on Linux.
+
 ## Data and privacy
 
-History is saved immediately to `%LOCALAPPDATA%\Dito\history.db`, with SQLite WAL
-sidecar files as needed. All unique entries are retained across restarts. Recopying
+History is saved to `%LOCALAPPDATA%\Dito\history.db` on Windows and
+`$XDG_DATA_HOME/dito/history.db` (default `~/.local/share/dito/history.db`) on Linux,
+with SQLite WAL sidecar files as needed. All unique entries are retained across restarts. Recopying
 identical text moves that entry to the top and replaces its saved formatting
 without adding another row; recalling an entry does not reorder it. Whitespace,
 case, and line endings are preserved.
@@ -63,9 +87,11 @@ startup are not implemented.
 ## Development and validation
 
 See `SPEC.md` for behavior and architecture and `AGENTS.md` for coding standards.
-Building from source requires Windows and the .NET 10 SDK. The locally built EXE
+Building from source requires the .NET 10 SDK. The locally built Windows EXE
 uses the installed Desktop Runtime; to package the runtime, publish with
 `-r win-x64 --self-contained true` (or `-r win-arm64`).
+
+### Windows
 
 Run `.\restart.ps1` in PowerShell to stop Dito in your session, publish a slim
 Release build, and start `artifacts\Dito\Dito.exe`. This needs the SDK to build,
@@ -76,18 +102,34 @@ tray first if you need a graceful shutdown.
 
 ```powershell
 dotnet build .\Dito.slnx -c Release
-.\src\Dito\bin\Release\net10.0-windows\Dito.exe
-dotnet test .\Dito.slnx -c Release --filter "Category!=Performance"
+.\src\Dito.Windows\bin\Release\net10.0-windows\Dito.exe
+dotnet test .\tests\Dito.Tests -c Release --filter "Category!=Performance"
+dotnet test .\tests\Dito.Windows.Tests -c Release --filter "Category!=Performance"
 dotnet format .\Dito.slnx --verify-no-changes --no-restore
 dotnet test .\Dito.slnx -c Release --filter "Category=Performance" --logger "console;verbosity=detailed"
 ```
+
+### Linux
+
+```bash
+dotnet test tests/Dito.Tests -c Release --filter 'Category!=Performance'
+dotnet test tests/Dito.Linux.Tests -c Release
+dotnet run --project src/Dito.Linux -c Release -- --show
+dotnet publish src/Dito.Linux -c Release -r linux-x64 --self-contained true
+```
+
+Swap `linux-x64` for `linux-arm64` to build the Arm64 archive. To verify formatting
+for the entire solution from Linux, run
+`dotnet restore Dito.slnx -p:EnableWindowsTargeting=true` followed by
+`EnableWindowsTargeting=true dotnet format Dito.slnx --verify-no-changes --no-restore`.
 
 Functional tests use temporary real SQLite databases and fake clipboard/input
 boundaries. WinForms smoke tests render a hidden form on a real STA message loop;
 they do not modify the live clipboard or inject keystrokes. The opt-in performance
 filter seeds 100,000 varied unique clips, measures inserts, recopy, reopen, search,
 and preview loading, and checks that the hidden UI continues processing messages.
-Running `dotnet test` without a filter also runs that slower performance test.
+Running the core or Windows test project without a filter also runs its slower
+performance test.
 
 ### Release process
 
@@ -100,8 +142,9 @@ Running `dotnet test` without a filter also runs that slower performance test.
    git push origin v0.1.1
    ```
 
-The Release workflow derives the build version from the tag, runs Windows tests,
-and publishes both ZIPs with the matching release notes. There is no project
+The Release workflow derives the build version from the tag, runs the core and
+matching app tests on each OS, and publishes the two Windows ZIPs and two Linux
+tar.gz archives with the matching release notes. There is no project
 version to bump; local builds use the .NET SDK default (`1.0.0`) unless you pass
 `-p:Version=...`. Do not reuse a released version or tag.
 If the tag push did not start a run, dispatch **Release** from `main` and enter the
@@ -138,3 +181,9 @@ An isolated native-clipboard integration check was attempted, but Windows denied
 creation of its private window station. Live clipboard round trips, actual shortcut
 conflicts, input injection, and Windows 11-specific interaction remain unverified;
 the real hidden-window listener registration and WinForms rendering checks passed.
+
+Linux capture, pause/resume, `--show`, search, exact plain-text recall, and
+self-write filtering were exercised on an isolated Xvfb server on Fedora x64.
+Tray registration and menu actions were checked against a test StatusNotifier
+watcher on a private D-Bus. Focus and tray behavior on real desktops still need
+manual checks.

@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
-    throw 'Dito currently runs only on Windows.'
+    throw 'This restart script is for Dito on Windows.'
 }
 
 $dotnet = (Get-Command dotnet -CommandType Application | Select-Object -First 1).Source
@@ -11,7 +11,7 @@ $rid = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitectu
     default { throw 'Dito supports Windows x64 and Arm64.' }
 }
 
-$project = Join-Path $PSScriptRoot 'src\Dito\Dito.csproj'
+$project = Join-Path $PSScriptRoot 'src\Dito.Windows\Dito.Windows.csproj'
 $output = Join-Path $PSScriptRoot 'artifacts\Dito'
 $exe = Join-Path $output 'Dito.exe'
 $session = (Get-Process -Id $PID).SessionId

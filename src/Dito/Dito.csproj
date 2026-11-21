@@ -1,19 +1,20 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>Dito.Core</AssemblyName>
+    <RootNamespace>Dito</RootNamespace>
     <Nullable>enable</Nullable>
-    <UseWindowsForms>true</UseWindowsForms>
-    <ApplicationIcon>Dito.ico</ApplicationIcon>
-    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <ItemGroup>
-    <EmbeddedResource Include="Dito.ico" LogicalName="Dito.ico" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.15" />
     <InternalsVisibleTo Include="Dito.Tests" />
+    <InternalsVisibleTo Include="Dito" />
+    <InternalsVisibleTo Include="Dito.Windows.Tests" />
+    <InternalsVisibleTo Include="Dito.Linux" />
+    <InternalsVisibleTo Include="Dito.Linux.Tests" />
   </ItemGroup>
 
 </Project>
