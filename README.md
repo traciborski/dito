@@ -68,9 +68,9 @@ uses the installed Desktop Runtime; to package the runtime, publish with
 `-r win-x64 --self-contained true` (or `-r win-arm64`).
 
 Run `.\restart.ps1` in PowerShell to stop Dito in your session, publish a slim
-Release build, and start `artifacts\Dito\Dito.exe`. This needs the SDK to build and the .NET 10 Desktop
-Runtime to run. If files from an older self-contained publish remain, remove the
-generated output folder once and rerun the script.
+Release build, and start `artifacts\Dito\Dito.exe`. This needs the SDK to build,
+and the .NET 10 Desktop Runtime to run. Both local builds and GitHub releases
+bundle SQLite with FTS5; only GitHub releases also bundle .NET.
 The script stops Dito without draining pending captures; use **Exit** in the
 tray first if you need a graceful shutdown.
 
