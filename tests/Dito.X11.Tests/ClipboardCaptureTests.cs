@@ -1,6 +1,6 @@
 using Dito.Tests;
 
-namespace Dito.Linux.Tests;
+namespace Dito.X11.Tests;
 
 public sealed class ClipboardCaptureTests
 {

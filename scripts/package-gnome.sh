@@ -20,5 +20,6 @@ cp "$source_dir/extension.js" "$source_dir/clipboard.js" "$source_dir/historyCli
 jq --arg version "$version" '. + {"version-name": $version}' "$source_dir/metadata.json" > "$stage/metadata.json"
 dotnet publish "$source_dir/History" -c Release -r "$rid" --self-contained true \
     "-p:Version=$version" -o "$stage/history"
+chmod 755 "$stage/history/Dito.Gnome.History"
 rm -f -- "$archive"
 (cd "$stage" && zip -qr "$archive" .)

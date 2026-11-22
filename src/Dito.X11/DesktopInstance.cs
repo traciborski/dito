@@ -2,7 +2,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Dito.Linux;
+namespace Dito.X11;
 
 internal sealed class DesktopInstance : IDisposable
 {

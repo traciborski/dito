@@ -36,10 +36,10 @@
   alongside plain text. The destination chooses a format. Ctrl+Enter copies plain
   text without pasting. Without a selection, no recall occurs.
 
-## Linux interaction and capture
+## X11 interaction and capture
 
-- The first `Dito.Linux` launch opens history and starts listening. Reopening
-  with `Dito.Linux --show` activates the existing instance over a local Unix
+- The first `Dito.X11` launch opens history and starts listening. Reopening
+  with `Dito.X11 --show` activates the existing instance over a local Unix
   socket in the user runtime directory. Bind this command in desktop settings
   for a shortcut; Dito does not register a global shortcut itself.
 - Search, page navigation, and plain-text preview use the shared history logic.
@@ -108,10 +108,10 @@
   the selection ready for manual paste; if replaced externally, leave the newer
   clipboard alone. Do not elevate, hook the keyboard, or force modifier releases.
 - `src\Dito` is the platform-neutral core (`Application`, `Storage`; assembly
-  `Dito.Core`). `src\Dito.Windows` (WinForms, `Dito.exe`) and `src\Dito.Linux`
-  (Avalonia, `Dito.Linux`) each have a `Program` that composes the core with
+  `Dito.Core`). `src\Dito.Windows` (WinForms, `Dito.exe`) and `src\Dito.X11`
+  (Avalonia, `Dito.X11`) each have a `Program` that composes the core with
   platform UI and integration. Run `Dito.Tests` on both platforms, plus the
-  matching `Dito.Windows.Tests` or `Dito.Linux.Tests`. `src/Dito.Gnome` contains
+  matching `Dito.Windows.Tests` or `Dito.X11.Tests`. `src/Dito.Gnome` contains
   the GJS extension and its bundled .NET helper. Test it in an isolated GNOME
   compositor with a temporary database and synthetic clipboard data. Use real temporary
   SQLite databases and fake clipboard/input boundaries for routine tests.

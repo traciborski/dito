@@ -12,7 +12,7 @@
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
     <ProjectReference Include="..\Dito\Dito.csproj" />
     <EmbeddedResource Include="..\Dito.Windows\Dito.ico" LogicalName="Dito.ico" />
-    <InternalsVisibleTo Include="Dito.Linux.Tests" />
+    <InternalsVisibleTo Include="Dito.X11.Tests" />
   </ItemGroup>
 
 </Project>

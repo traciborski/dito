@@ -1,6 +1,6 @@
 using Dito.Storage;
 
-namespace Dito.Linux;
+namespace Dito.X11;
 
 internal sealed class ClipboardCapture(
     HistoryStore history, Func<long> revision, Func<Task<string?>> readText)

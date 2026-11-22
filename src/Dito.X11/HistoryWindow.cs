@@ -7,7 +7,7 @@ using Avalonia.Media;
 using Avalonia.VisualTree;
 using Dito.Application;
 
-namespace Dito.Linux;
+namespace Dito.X11;
 
 internal sealed class HistoryWindow : Window
 {

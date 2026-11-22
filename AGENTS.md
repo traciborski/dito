@@ -9,7 +9,7 @@
   and keep affected README and release notes in sync. Omit implementation examples
   already maintained in code; keep pending release notes under `Unreleased`.
 - Implementation lives in `src\Dito` (platform-neutral core), `src\Dito.Windows`
-  (WinForms and Win32), `src\Dito.Linux` (Avalonia and X11), and
+  (WinForms and Win32), `src\Dito.X11` (Avalonia and X11), and
   `src\Dito.Gnome` (GNOME Shell extension with a bundled history helper).
   Tests live in the matching `tests\Dito*.Tests` directories.
 - Favor the simplest complete implementation. Make small, coherent changes and

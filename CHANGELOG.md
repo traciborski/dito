@@ -1,11 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - Add `Dito.Gnome`, a GNOME Shell 50 extension for Wayland clipboard capture and
   a searchable history popup. Enable the extension without launching another app.
-- Add an Avalonia Linux app for native X11 sessions with text capture, searchable
-  history, and copy-back for manual paste.
+- Add `Dito.X11` (previously named `Dito.Linux` in development), an Avalonia app
+  for native X11 with text capture, searchable history, and manual paste.
 - Split the shared history code from the Windows and Linux frontends. Releases
   include Linux x64 and Arm64 archives alongside the existing Windows ZIPs.
 

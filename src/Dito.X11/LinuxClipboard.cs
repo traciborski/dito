@@ -1,7 +1,7 @@
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 
-namespace Dito.Linux;
+namespace Dito.X11;
 
 internal sealed class LinuxClipboard(IClipboard clipboard)
 {

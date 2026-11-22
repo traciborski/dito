@@ -1,6 +1,6 @@
 using System.Runtime.InteropServices;
 
-namespace Dito.Linux;
+namespace Dito.X11;
 
 internal sealed class X11Selection : IDisposable
 {

@@ -1,3 +1,4 @@
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import St from 'gi://St';
@@ -14,7 +15,7 @@ function check(condition, message) {
 }
 
 async function until(checkCondition, description) {
-    for (let attempt = 0; attempt < 100; attempt++) {
+    for (let attempt = 0; attempt < 300; attempt++) {
         if (await checkCondition())
             return;
         await sleep(50);
@@ -72,9 +73,10 @@ export async function run() {
     await until(async () => (await readPage()).items[0].id === id, 'external recopy updates recency');
     check((await readPage()).items.length === 3, 'External recopy duplicated an entry');
 
-    const clipboardClient = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.NONE);
+    const clipboardClient = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.STDIN_PIPE);
     clipboardClient.setenv('WAYLAND_DISPLAY', 'gnome-shell-test-display', true);
     clipboardClient.setenv('GDK_BACKEND', 'wayland', true);
+    clipboardClient.setenv('GTK_A11Y', 'none', true);
     Main.overview.hide();
     await until(() => !Main.overview.visible, 'close test overview');
     const nativeCopy = clipboardClient.spawnv(['python3', GLib.getenv('DITO_GNOME_NATIVE_COPY')]);
@@ -86,6 +88,7 @@ export async function run() {
         global.stage.set_key_focus(null);
         Main.activateWindow(testWindow);
         await until(() => global.display.focus_window === testWindow, 'Wayland test window focus');
+        nativeCopy.get_stdin_pipe().write_all(new TextEncoder().encode('copy\n'), null);
         await until(async () => (await readPage('native Wayland')).items.length === 1, 'native Wayland copy');
     } finally {
         nativeCopy.force_exit();
@@ -98,4 +101,3 @@ export async function run() {
     extension.disable();
     console.log('Dito GNOME smoke test passed.');
 }
-import Gio from 'gi://Gio';

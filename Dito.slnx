@@ -2,12 +2,12 @@
   <Folder Name="/src/">
     <Project Path="src/Dito/Dito.csproj" />
     <Project Path="src/Dito.Gnome/History/Dito.Gnome.History.csproj" />
-    <Project Path="src/Dito.Linux/Dito.Linux.csproj" />
     <Project Path="src/Dito.Windows/Dito.Windows.csproj" />
+    <Project Path="src/Dito.X11/Dito.X11.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Dito.Tests/Dito.Tests.csproj" />
-    <Project Path="tests/Dito.Linux.Tests/Dito.Linux.Tests.csproj" />
     <Project Path="tests/Dito.Windows.Tests/Dito.Windows.Tests.csproj" />
+    <Project Path="tests/Dito.X11.Tests/Dito.X11.Tests.csproj" />
   </Folder>
 </Solution>

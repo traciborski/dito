@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Dito.Linux\Dito.Linux.csproj" />
+    <ProjectReference Include="..\..\src\Dito.X11\Dito.X11.csproj" />
     <Compile Include="..\Dito.Tests\TestDatabase.cs" />
     <Using Include="Xunit" />
   </ItemGroup>

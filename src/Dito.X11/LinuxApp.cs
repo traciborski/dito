@@ -6,7 +6,7 @@ using Avalonia.Threading;
 using Dito.Application;
 using Dito.Storage;
 
-namespace Dito.Linux;
+namespace Dito.X11;
 
 [SupportedOSPlatform("linux")]
 internal sealed class LinuxApp(DesktopInstance instance) : Avalonia.Application

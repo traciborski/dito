@@ -2,7 +2,7 @@ using System.Runtime.Versioning;
 using Avalonia;
 using Avalonia.Controls;
 
-namespace Dito.Linux;
+namespace Dito.X11;
 
 internal static class Program
 {
@@ -10,13 +10,13 @@ internal static class Program
     {
         if (args is ["--help"] or ["-h"])
         {
-            Console.WriteLine("Usage: Dito.Linux [--show] (native X11 session required)");
+            Console.WriteLine("Usage: Dito.X11 [--show] (native X11 session required)");
             return 0;
         }
 
         if (args is not [] and not ["--show"])
         {
-            Console.Error.WriteLine("Usage: Dito.Linux [--show]");
+            Console.Error.WriteLine("Usage: Dito.X11 [--show]");
             return 1;
         }
 

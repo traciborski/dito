@@ -13,8 +13,8 @@
     <InternalsVisibleTo Include="Dito.Tests" />
     <InternalsVisibleTo Include="Dito" />
     <InternalsVisibleTo Include="Dito.Windows.Tests" />
-    <InternalsVisibleTo Include="Dito.Linux" />
-    <InternalsVisibleTo Include="Dito.Linux.Tests" />
+    <InternalsVisibleTo Include="Dito.X11" />
+    <InternalsVisibleTo Include="Dito.X11.Tests" />
     <InternalsVisibleTo Include="Dito.Gnome.History" />
   </ItemGroup>
 

@@ -47,14 +47,15 @@ provide a usable target; the keyboard shortcut is the primary recall workflow.
 
 Use a native X11 session (`echo "$XDG_SESSION_TYPE"` should print `x11`).
 This executable does not run on Wayland or XWayland. Select the
-`linux-x64` or `linux-arm64` tar.gz, extract the whole archive, and run `./Dito.Linux`.
+`Dito-X11` tar.gz for `linux-x64` or `linux-arm64`, extract the whole archive,
+and run `./Dito.X11`.
 The archive includes .NET and SQLite. It still needs your distro's desktop
 libraries (X11 with XFixes, fontconfig, and standard .NET system dependencies).
 The same app is used across distros; compatibility has not been verified
 across every distro and window manager.
 
 Copy text in another app, then open history from the tray or by running
-`/absolute/path/to/Dito.Linux --show`. Set that command as a custom keyboard
+`/absolute/path/to/Dito.X11 --show`. Set that command as a custom keyboard
 shortcut in your desktop settings. Search, use Up/Down and PageUp/PageDown to
 navigate, and press Enter or Ctrl+Enter to copy the original plain text and hide
 history. Paste manually in the destination app. Keep Dito running until you've
@@ -130,9 +131,9 @@ dotnet test .\Dito.slnx -c Release --filter "Category=Performance" --logger "con
 
 ```bash
 dotnet test tests/Dito.Tests -c Release --filter 'Category!=Performance'
-dotnet test tests/Dito.Linux.Tests -c Release
-dotnet run --project src/Dito.Linux -c Release -- --show
-dotnet publish src/Dito.Linux -c Release -r linux-x64 --self-contained true
+dotnet test tests/Dito.X11.Tests -c Release
+dotnet run --project src/Dito.X11 -c Release -- --show
+dotnet publish src/Dito.X11 -c Release -r linux-x64 --self-contained true
 ```
 
 Swap `linux-x64` for `linux-arm64` to build the Arm64 archive. To verify formatting
