@@ -100,6 +100,7 @@ jobs:
             dotnet publish src/Dito.Linux -c Release -r "$rid" --self-contained true \
               "-p:Version=$RELEASE_VERSION" -o "publish/$rid"
             tar -czf "release/Dito-$RELEASE_TAG-$rid.tar.gz" -C "publish/$rid" .
+            bash scripts/package-gnome.sh "$rid" "$RELEASE_VERSION" "release/Dito-Gnome-$RELEASE_TAG-$rid.zip"
           done
 
       - uses: actions/upload-artifact@v4
@@ -127,4 +128,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "Dito $RELEASE_TAG" --notes-file notes.md \
             "Dito-$RELEASE_TAG-win-x64.zip" "Dito-$RELEASE_TAG-win-arm64.zip" \
-            "Dito-$RELEASE_TAG-linux-x64.tar.gz" "Dito-$RELEASE_TAG-linux-arm64.tar.gz"
+            "Dito-$RELEASE_TAG-linux-x64.tar.gz" "Dito-$RELEASE_TAG-linux-arm64.tar.gz" \
+            "Dito-Gnome-$RELEASE_TAG-linux-x64.zip" "Dito-Gnome-$RELEASE_TAG-linux-arm64.zip"

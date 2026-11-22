@@ -9,12 +9,13 @@
   and keep affected README and release notes in sync. Omit implementation examples
   already maintained in code; keep pending release notes under `Unreleased`.
 - Implementation lives in `src\Dito` (platform-neutral core), `src\Dito.Windows`
-  (WinForms and Win32), and `src\Dito.Linux` (Avalonia and X11). Tests live in
-  the matching `tests\Dito*.Tests` projects.
+  (WinForms and Win32), `src\Dito.Linux` (Avalonia and X11), and
+  `src\Dito.Gnome` (GNOME Shell extension with a bundled history helper).
+  Tests live in the matching `tests\Dito*.Tests` directories.
 - Favor the simplest complete implementation. Make small, coherent changes and
   verify each working increment.
-- Keep the core free of UI and OS references. Each platform gets one frontend
-  project (`Dito.Windows` or `Dito.Linux`).
+- Keep the core free of UI and OS references. Each desktop option has one
+  frontend, with no dependency on the other frontends.
 
 ## Abstraction and responsibility
 

@@ -1,7 +1,7 @@
 # Dito
 
-A small, local clipboard history app for Windows 11 and native Linux X11 sessions.
-Both apps use .NET 10 and SQLite FTS5 for persistent text history, exact-text
+A small, local clipboard history app for Windows 11, native Linux X11, and GNOME
+Shell 50 on Wayland. All versions use .NET 10 and SQLite FTS5 for persistent text history, exact-text
 deduplication, and search. Windows also captures optional HTML/RTF formatting.
 
 ## Install and run
@@ -46,7 +46,7 @@ provide a usable target; the keyboard shortcut is the primary recall workflow.
 ### Linux (native X11)
 
 Use a native X11 session (`echo "$XDG_SESSION_TYPE"` should print `x11`).
-**Wayland and XWayland are not supported**, including GNOME Wayland. Select the
+This executable does not run on Wayland or XWayland. Select the
 `linux-x64` or `linux-arm64` tar.gz, extract the whole archive, and run `./Dito.Linux`.
 The archive includes .NET and SQLite. It still needs your distro's desktop
 libraries (X11 with XFixes, fontconfig, and standard .NET system dependencies).
@@ -64,6 +64,23 @@ Escape and closing the window hide it. The tray requires StatusNotifierItem
 support; use the window's **Pause Capture** and **Exit** buttons if the tray icon
 is unavailable. There is no automatic paste, formatted capture or recall, or
 automatic startup registration on Linux.
+
+### GNOME Shell 50 (Wayland)
+
+Download the `Dito-Gnome` extension ZIP for `linux-x64` or `linux-arm64` and install
+it without extracting it first:
+
+```bash
+gnome-extensions install ./Dito-Gnome-v0.2.0-linux-x64.zip
+```
+
+Log out and back in if GNOME doesn't see the extension yet. Enable **Dito** in
+the Extensions app or run `gnome-extensions enable dito@traciborski.github.io`.
+Use the clipboard icon in the top panel to open history, search, preview, pause,
+or copy back. Press Enter to copy, then paste manually in your destination.
+You don't need to launch the X11 app or install .NET. Disabling the extension
+stops capture. The extension and native X11 app share Linux history if used in
+separate sessions.
 
 ## Data and privacy
 
@@ -123,6 +140,19 @@ for the entire solution from Linux, run
 `dotnet restore Dito.slnx -p:EnableWindowsTargeting=true` followed by
 `EnableWindowsTargeting=true dotnet format Dito.slnx --verify-no-changes --no-restore`.
 
+To package the GNOME extension locally (requires `jq` and `zip`):
+
+```bash
+bash scripts/package-gnome.sh linux-x64 0.2.0 artifacts/Dito-Gnome-local.zip
+```
+
+On GNOME 50, the smoke test requires `gnome-shell-test-tool` and Python with
+PyGObject and GTK 4. It uses a private headless compositor and temporary history:
+
+```bash
+bash scripts/test-gnome.sh "$PWD/artifacts/Dito-Gnome-local.zip"
+```
+
 Functional tests use temporary real SQLite databases and fake clipboard/input
 boundaries. WinForms smoke tests render a hidden form on a real STA message loop;
 they do not modify the live clipboard or inject keystrokes. The opt-in performance
@@ -143,8 +173,8 @@ performance test.
    ```
 
 The Release workflow derives the build version from the tag, runs the core and
-matching app tests on each OS, and publishes the two Windows ZIPs and two Linux
-tar.gz archives with the matching release notes. There is no project
+matching app tests on each OS, and publishes Windows ZIPs, native X11 tar.gz
+archives, and GNOME extension ZIPs with the matching release notes. There is no project
 version to bump; local builds use the .NET SDK default (`1.0.0`) unless you pass
 `-p:Version=...`. Do not reuse a released version or tag.
 If the tag push did not start a run, dispatch **Release** from `main` and enter the
@@ -187,3 +217,7 @@ self-write filtering were exercised on an isolated Xvfb server on Fedora x64.
 Tray registration and menu actions were checked against a test StatusNotifier
 watcher on a private D-Bus. Focus and tray behavior on real desktops still need
 manual checks.
+
+On Fedora x64, the packaged GNOME extension passed an isolated GNOME Shell 50.6
+smoke test for native Wayland capture, search, preview, exact-text recall, pause,
+and persistence. It was not installed in the live session or tested on Ubuntu.

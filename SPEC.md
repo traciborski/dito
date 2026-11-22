@@ -2,9 +2,10 @@
 
 ## Scope and distribution
 
-- Local clipboard history for Windows 11 (WinForms) and native Linux X11
-  sessions (Avalonia) on .NET 10 LTS, with bundled SQLite FTS5 and no application
-  network traffic or telemetry. Wayland, XWayland, and macOS are not supported.
+- Local clipboard history for Windows 11 (WinForms), native Linux X11
+  sessions (Avalonia), and GNOME Shell 50 on Wayland (Shell extension). All use
+  .NET 10 LTS and bundled SQLite FTS5 for history. No application network
+  traffic or telemetry. Other Wayland desktops and macOS are not supported.
 - Start manually; one instance per user per Windows session or X11 display.
   No startup registration, synchronization, encryption, pinning, standalone images,
   deletion, or automatic pruning.
@@ -12,7 +13,8 @@
 - Release from a `vMAJOR.MINOR.PATCH` Git tag. The tag sets the build version;
   the matching `CHANGELOG.md` section supplies release notes.
   Publish self-contained Windows x64 and Arm64 ZIPs and Linux x64 and Arm64
-  tar.gz archives with bundled SQLite and .NET. Linux needs system desktop libraries.
+  tar.gz archives and GNOME extension ZIPs with bundled SQLite and .NET.
+  Linux needs system desktop libraries.
   Local restart builds use the installed .NET Desktop Runtime. See `README.md`
   for release and development commands.
 
@@ -56,12 +58,27 @@
 
 ## Capture, storage, and search
 
+### GNOME Shell 50 on Wayland
+
+- Enable `Dito.Gnome` in GNOME Shell. The extension owns the panel menu and
+  watches the compositor's `CLIPBOARD` selection. It reads external UTF-8
+  plain text asynchronously, discards superseded reads, and ignores its own
+  recall by selection-owner identity. No automatic paste or rich-text capture.
+- Open the panel menu to search, page, and preview. Copy or Enter offers the
+  original text and closes the popup; paste manually in the destination.
+  Pause stops new capture. Disabling the extension stops monitoring.
+- The extension starts its bundled history helper on demand, communicates over
+  private process pipes, and closes it on disable. No companion app is required.
+  The helper reuses the native X11 app's Linux database and the shared .NET core.
+
+### Shared history and Windows capture
+
 - On Windows, an explicitly created message-only HWND listens via `AddClipboardFormatListener`.
   Read on the STA thread. Ignore empty/non-text, monitor-excluded, and self-written
   clipboard content; preserve whitespace, case, and line endings. Retry a busy
   clipboard briefly and cancel superseded reads. The bounded capture queue drains
   on exit; failures can pause capture rather than silently dropping history.
-- On Windows, store at `%LOCALAPPDATA%\Dito\history.db`. Both apps use WAL,
+- On Windows, store at `%LOCALAPPDATA%\Dito\history.db`. All frontends use WAL,
   bounded lock waits, and off-UI-thread database access with an explicitly owned,
   serialized connection.
   The database and sidecars are unencrypted. HTML/RTF can contain metadata or
@@ -94,7 +111,9 @@
   `Dito.Core`). `src\Dito.Windows` (WinForms, `Dito.exe`) and `src\Dito.Linux`
   (Avalonia, `Dito.Linux`) each have a `Program` that composes the core with
   platform UI and integration. Run `Dito.Tests` on both platforms, plus the
-  matching `Dito.Windows.Tests` or `Dito.Linux.Tests`. Use real temporary
+  matching `Dito.Windows.Tests` or `Dito.Linux.Tests`. `src/Dito.Gnome` contains
+  the GJS extension and its bundled .NET helper. Test it in an isolated GNOME
+  compositor with a temporary database and synthetic clipboard data. Use real temporary
   SQLite databases and fake clipboard/input boundaries for routine tests.
   Measure the 100,000-entry workflow before making performance claims. Record
   platform integration checks and limitations in `README.md`.

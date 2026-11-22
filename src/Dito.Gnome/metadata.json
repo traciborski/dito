@@ -1,0 +1,7 @@
+{
+    "uuid": "dito@traciborski.github.io",
+    "name": "Dito",
+    "description": "Local plain-text clipboard history for GNOME Wayland.",
+    "shell-version": ["50"],
+    "url": "https://github.com/traciborski/dito"
+}

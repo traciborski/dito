@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Dito/Dito.csproj" />
+    <Project Path="src/Dito.Gnome/History/Dito.Gnome.History.csproj" />
     <Project Path="src/Dito.Linux/Dito.Linux.csproj" />
     <Project Path="src/Dito.Windows/Dito.Windows.csproj" />
   </Folder>
