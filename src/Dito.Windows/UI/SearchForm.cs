@@ -25,6 +25,9 @@ internal sealed class SearchForm : Form
     };
     private readonly Button _newer = new() { Text = "Newer", AutoSize = true, Enabled = false };
     private readonly Button _older = new() { Text = "Older", AutoSize = true, Enabled = false };
+    private readonly TextBox _label = new() { PlaceholderText = "Optional label", Width = 160, Enabled = false };
+    private readonly Button _saveLabel = new() { Text = "Save label", AutoSize = true, Enabled = false };
+    private readonly Button _delete = new() { Text = "Delete entry", AutoSize = true, Enabled = false };
     private readonly Label _status = new() { AutoSize = true, Dock = DockStyle.Fill };
     private bool _updatingResults;
     private bool _resettingQuery;
@@ -71,6 +74,7 @@ internal sealed class SearchForm : Form
         _results.Enabled = !recalling;
         _newer.Enabled = !recalling && _canLoadNewer;
         _older.Enabled = !recalling && _canLoadOlder;
+        UpdateEntryActions();
         if (recalling)
         {
             ShowStatus("Preparing selected text...");
@@ -135,6 +139,33 @@ internal sealed class SearchForm : Form
             return true;
         }
 
+        if (keyData == Keys.Delete && !_label.Focused && _results.SelectedItem is HistoryListItem)
+        {
+            if ((message.LParam.ToInt64() & (1L << 30)) == 0)
+            {
+                _ = DeleteSelectedAsync();
+            }
+
+            return true;
+        }
+
+        if (keyData == Keys.Enter && (_label.Focused || _saveLabel.Focused))
+        {
+            _ = SaveLabelAsync();
+            return true;
+        }
+
+        if (keyData == Keys.Enter && _delete.Focused)
+        {
+            _ = DeleteSelectedAsync();
+            return true;
+        }
+
+        if (_label.Focused)
+        {
+            return base.ProcessCmdKey(ref message, keyData);
+        }
+
         var recallMode = keyData switch
         {
             Keys.Enter => RecallMode.PasteText,
@@ -185,6 +216,7 @@ internal sealed class SearchForm : Form
         _searchBox.AccessibleName = "Search clipboard history";
         _results.AccessibleName = "History results";
         _preview.AccessibleName = "Original text preview";
+        _label.AccessibleName = "Selected entry label";
 
         var content = new SplitContainer
         {
@@ -199,7 +231,7 @@ internal sealed class SearchForm : Form
         content.Panel2.Controls.Add(_preview);
 
         var navigation = new FlowLayoutPanel { Dock = DockStyle.Fill, AutoSize = true };
-        navigation.Controls.AddRange([_newer, _older]);
+        navigation.Controls.AddRange([_newer, _older, _label, _saveLabel, _delete]);
         var layout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
@@ -218,7 +250,7 @@ internal sealed class SearchForm : Form
         layout.Controls.Add(_status, 0, 3);
         layout.Controls.Add(new Label
         {
-            Text = "Enter: text   Shift+Enter: formatted   Ctrl+Enter: copy   PgUp/PgDn   Esc",
+            Text = "Enter: text   Shift+Enter: formatted   Ctrl+Enter: copy   Del: delete   PgUp/PgDn   Esc",
             AutoSize = true,
             ForeColor = SystemColors.GrayText
         }, 0, 4);
@@ -237,6 +269,8 @@ internal sealed class SearchForm : Form
         _results.FormattingEnabled = true;
         _newer.Click += OnNewerClicked;
         _older.Click += OnOlderClicked;
+        _saveLabel.Click += async (_, _) => await SaveLabelAsync();
+        _delete.Click += async (_, _) => await DeleteSelectedAsync();
         _search.Loading += OnLoading;
         _search.ResultsChanged += OnResultsChanged;
         _search.PreviewChanged += OnPreviewChanged;
@@ -290,10 +324,37 @@ internal sealed class SearchForm : Form
 
     private void RequestRecall(RecallMode mode)
     {
-        if (_results.SelectedItem is HistoryListItem item)
+        if (!_search.IsChanging && _results.SelectedItem is HistoryListItem item)
         {
             RecallRequested?.Invoke(item.Id, mode);
         }
+    }
+
+    private async Task DeleteSelectedAsync()
+    {
+        if (!_recalling && !_search.IsChanging && _results.SelectedItem is HistoryListItem item)
+        {
+            _searchBox.Focus();
+            await _search.DeleteEntryAsync(item.Id);
+        }
+    }
+
+    private async Task SaveLabelAsync()
+    {
+        if (!_recalling && !_search.IsChanging && _results.SelectedItem is HistoryListItem item)
+        {
+            var label = _label.Text;
+            _searchBox.Focus();
+            await _search.SetLabelAsync(item.Id, label);
+        }
+    }
+
+    private void UpdateEntryActions()
+    {
+        var enabled = !_recalling && _results.SelectedItem is HistoryListItem;
+        _label.Enabled = enabled;
+        _saveLabel.Enabled = enabled;
+        _delete.Enabled = enabled;
     }
 
     private void MoveSelection(int direction)
@@ -317,7 +378,10 @@ internal sealed class SearchForm : Form
     {
         if (!_updatingResults)
         {
-            _search.Select((_results.SelectedItem as HistoryListItem)?.Id);
+            var item = _results.SelectedItem as HistoryListItem;
+            _label.Text = item?.Label ?? "";
+            UpdateEntryActions();
+            _search.Select(item?.Id);
         }
     }
 
@@ -349,6 +413,8 @@ internal sealed class SearchForm : Form
         _results.Items.Clear();
         _updatingResults = false;
         _preview.Clear();
+        _label.Clear();
+        UpdateEntryActions();
         _canLoadNewer = false;
         _canLoadOlder = false;
         _newer.Enabled = false;
@@ -386,9 +452,10 @@ internal sealed class SearchForm : Form
     {
         if (e.ListItem is HistoryListItem item)
         {
-            e.Value = string.IsNullOrWhiteSpace(item.Preview)
+            var preview = string.IsNullOrWhiteSpace(item.Preview)
                 ? "[Whitespace]"
                 : item.Preview.Replace("\r\n", " | ").Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' ');
+            e.Value = item.Label is null ? preview : $"[{item.Label}] {preview}";
         }
     }
 

@@ -11,8 +11,9 @@ $rid = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitectu
     default { throw 'Dito supports Windows x64 and Arm64.' }
 }
 
-$project = Join-Path $PSScriptRoot 'src\Dito.Windows\Dito.Windows.csproj'
-$output = Join-Path $PSScriptRoot 'artifacts\Dito'
+$root = Split-Path -Parent $PSScriptRoot
+$project = Join-Path $root 'src\Dito.Windows\Dito.Windows.csproj'
+$output = Join-Path $root 'artifacts\Dito'
 $exe = Join-Path $output 'Dito.exe'
 $session = (Get-Process -Id $PID).SessionId
 

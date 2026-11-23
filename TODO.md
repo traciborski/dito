@@ -30,8 +30,6 @@
 
 ## Code and release checks
 
-- [ ] Fix the extra empty Older page when a query has exactly a multiple of 100
-  results. Test both recent history and filtered search at the page boundary.
 - [ ] Run tests and formatter checks on pushes and pull requests, not just
   releases. Keep the isolated GNOME smoke test in the release checklist until it
   can run on a suitable CI runner.

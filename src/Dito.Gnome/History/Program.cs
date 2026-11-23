@@ -67,7 +67,7 @@ internal static class Program
             var page = await history.SearchAsync(request.Query ?? "", request.Cursor);
             return new
             {
-                items = page.Items.Select(item => new { id = item.Id.ToString(), item.Preview }),
+                items = page.Items.Select(item => new { id = item.Id.ToString(), item.Preview, item.Label }),
                 nextCursor = page.NextCursor?.ToString()
             };
         }
@@ -77,8 +77,19 @@ internal static class Program
             return await history.ReadTextAsync(request.Id.Value);
         }
 
+        if (request.Operation == "delete" && request.Id is { } deleteId)
+        {
+            return await history.DeleteEntryAsync(deleteId);
+        }
+
+        if (request.Operation == "setLabel" && request.Id is { } labelId)
+        {
+            return await history.SetLabelAsync(labelId, request.Label);
+        }
+
         throw new InvalidDataException();
     }
 
-    private sealed record Request(string Operation, string? Text, long CopiedAt, string? Query, long? Cursor, long? Id);
+    private sealed record Request(
+        string Operation, string? Text, long CopiedAt, string? Query, long? Cursor, long? Id, string? Label);
 }

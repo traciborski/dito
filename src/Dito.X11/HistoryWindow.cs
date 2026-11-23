@@ -21,12 +21,16 @@ internal sealed class HistoryWindow : Window
     private readonly Button _newer = new() { Content = "Newer", IsEnabled = false };
     private readonly Button _older = new() { Content = "Older", IsEnabled = false };
     private readonly Button _copy = new() { Content = "Copy", IsEnabled = false };
+    private readonly TextBox _label = new() { PlaceholderText = "Optional label", MinWidth = 140, IsEnabled = false };
+    private readonly Button _saveLabel = new() { Content = "Save label", IsEnabled = false };
+    private readonly Button _delete = new() { Content = "Delete entry", IsEnabled = false };
     private readonly Button _pause = new() { Content = "Pause Capture", IsEnabled = false };
     private readonly Button _exit = new() { Content = "Exit" };
     private bool _ready;
     private bool _closing;
     private bool _opening;
     private bool _copying;
+    private bool _deleteHeld;
     private CancellationTokenSource? _recall;
 
     public HistoryWindow(HistorySearch search, Func<long, CancellationToken, Task<bool>> copyEntry, WindowIcon icon)
@@ -53,7 +57,8 @@ internal sealed class HistoryWindow : Window
         {
             _recall?.Cancel();
             _search.Select(Selected?.Id);
-            _copy.IsEnabled = Selected is not null && !_copying;
+            _label.Text = Selected?.Label ?? "";
+            UpdateEntryActions();
         };
         _entries.DoubleTapped += async (_, args) =>
         {
@@ -63,6 +68,8 @@ internal sealed class HistoryWindow : Window
             }
         };
         _copy.Click += async (_, _) => await CopySelectedAsync();
+        _saveLabel.Click += async (_, _) => await SaveLabelAsync();
+        _delete.Click += async (_, _) => await DeleteSelectedAsync();
         _newer.Click += (_, _) => _search.LoadNewer();
         _older.Click += (_, _) => _search.LoadOlder();
         _pause.Click += (_, _) => ToggleCapture?.Invoke();
@@ -76,6 +83,14 @@ internal sealed class HistoryWindow : Window
             }
         };
         AddHandler(KeyDownEvent, HandleKeyAsync, RoutingStrategies.Tunnel);
+        AddHandler(KeyUpEvent, (_, args) =>
+        {
+            if (args.Key == Key.Delete)
+            {
+                _deleteHeld = false;
+            }
+        }, RoutingStrategies.Tunnel);
+        Deactivated += (_, _) => _deleteHeld = false;
         _search.Loading += ShowLoading;
         _search.ResultsChanged += ShowResults;
         _search.PreviewChanged += text => _preview.Text = text;
@@ -138,12 +153,18 @@ internal sealed class HistoryWindow : Window
             Spacing = 8,
             Children = { _newer, _older, _copy, _pause, _exit }
         };
+        var entryActions = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8,
+            Children = { _label, _saveLabel, _delete }
+        };
         var grid = new Grid
         {
             Margin = new Thickness(12),
             RowSpacing = 8,
-            RowDefinitions = new RowDefinitions("Auto,3*,2*,Auto,Auto,Auto"),
-            Children = { _query, _entries, _preview, _status, _captureStatus, buttons }
+            RowDefinitions = new RowDefinitions("Auto,3*,2*,Auto,Auto,Auto,Auto"),
+            Children = { _query, _entries, _preview, entryActions, _status, _captureStatus, buttons }
         };
         for (var index = 0; index < grid.Children.Count; index++)
         {
@@ -181,11 +202,31 @@ internal sealed class HistoryWindow : Window
 
     private async void HandleKeyAsync(object? sender, KeyEventArgs args)
     {
+        if (_label.IsFocused && args.Key != Key.Escape)
+        {
+            if (args.Key == Key.Enter && args.KeyModifiers == KeyModifiers.None)
+            {
+                args.Handled = true;
+                await SaveLabelAsync();
+            }
+
+            return;
+        }
+
         switch (args.Key)
         {
             case Key.Escape:
                 HideHistory();
                 break;
+            case Key.Delete when args.KeyModifiers == KeyModifiers.None && (_deleteHeld || Selected is not null):
+                args.Handled = true;
+                if (!_deleteHeld)
+                {
+                    _deleteHeld = true;
+                    await DeleteSelectedAsync();
+                }
+
+                return;
             case Key.Enter when args.KeyModifiers == KeyModifiers.Control ||
                 (args.KeyModifiers == KeyModifiers.None && args.Source is not Button):
                 args.Handled = true;
@@ -216,13 +257,13 @@ internal sealed class HistoryWindow : Window
 
     private async Task CopySelectedAsync()
     {
-        if (_copying || Selected is not { } selected)
+        if (_copying || _search.IsChanging || Selected is not { } selected)
         {
             return;
         }
 
         _copying = true;
-        _copy.IsEnabled = false;
+        UpdateEntryActions();
         using var recall = new CancellationTokenSource();
         _recall = recall;
         try
@@ -252,12 +293,44 @@ internal sealed class HistoryWindow : Window
         {
             _recall = null;
             _copying = false;
-            _copy.IsEnabled = Selected is not null;
+            UpdateEntryActions();
         }
+    }
+
+    private async Task DeleteSelectedAsync()
+    {
+        if (!_copying && !_search.IsChanging && Selected is { } selected)
+        {
+            _query.Focus();
+            await _search.DeleteEntryAsync(selected.Id);
+        }
+    }
+
+    private async Task SaveLabelAsync()
+    {
+        if (!_copying && !_search.IsChanging && Selected is { } selected)
+        {
+            var label = _label.Text ?? "";
+            _query.Focus();
+            await _search.SetLabelAsync(selected.Id, label);
+        }
+    }
+
+    private void UpdateEntryActions()
+    {
+        var enabled = Selected is not null && !_copying;
+        _copy.IsEnabled = enabled;
+        _label.IsEnabled = enabled;
+        _saveLabel.IsEnabled = enabled;
+        _delete.IsEnabled = enabled;
     }
 
     private sealed record DisplayEntry(HistoryListItem Entry)
     {
-        public override string ToString() => Entry.Preview.ReplaceLineEndings(" ").Replace('\t', ' ');
+        public override string ToString()
+        {
+            var preview = Entry.Preview.ReplaceLineEndings(" ").Replace('\t', ' ');
+            return Entry.Label is null ? preview : $"[{Entry.Label}] {preview}";
+        }
     }
 }

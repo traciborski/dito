@@ -28,6 +28,7 @@ case-insensitive word matching, not arbitrary substring matching. For example,
 | Paste as plain text into the previously active app | Enter |
 | Paste with original formatting when available | Shift+Enter |
 | Copy plain text without pasting | Ctrl+Enter |
+| Delete the selected entry without confirmation | Delete |
 | Older / newer page | PageDown / PageUp |
 | Close the popup, keeping capture running | Escape |
 
@@ -83,18 +84,36 @@ You don't need to launch the X11 app or install .NET. Disabling the extension
 stops capture. The extension and native X11 app share Linux history if used in
 separate sessions.
 
+### Find by label or delete an entry (all platforms)
+
+Select an entry, type an **Optional label**, and choose **Save label** (or press
+Enter in the label field). For example, label `alice@example.com` as `email`,
+then search for `email` and press Enter to recall `alice@example.com`, not the
+label. The usual search rules apply: all terms must match the clip text or its
+label. Labels can be shared by multiple entries, survive recopies, and can be
+cleared by saving a blank label.
+
+Press **Delete** or choose **Delete entry** to remove the selected result without
+confirmation or undo. With a result selected, Delete removes it even while the
+search box is focused; in the label field, Delete edits the label as usual.
+Deleting an entry does not clear the system clipboard.
+This version upgrades the history database; v0.2.0 and older cannot read it
+after the upgrade.
+
 ## Data and privacy
 
 History is saved to `%LOCALAPPDATA%\Dito\history.db` on Windows and
 `$XDG_DATA_HOME/dito/history.db` (default `~/.local/share/dito/history.db`) on Linux,
-with SQLite WAL sidecar files as needed. All unique entries are retained across restarts. Recopying
-identical text moves that entry to the top and replaces its saved formatting
-without adding another row; recalling an entry does not reorder it. Whitespace,
+with SQLite WAL sidecar files as needed. Unique entries are retained across
+restarts unless deleted. Copying identical text again from another app moves
+the existing entry to the top and replaces its saved formatting without adding
+another row or removing its label. Recalling an entry does not reorder it. Whitespace,
 case, and line endings are preserved.
 
 **Storage is unencrypted and may retain secrets indefinitely.** HTML and RTF can
 also include source metadata or embedded content not shown in the preview. There
-is no Clear History command, automatic pruning, network activity, or telemetry. Pause prevents
+is no Clear History command, automatic pruning, network activity, or telemetry.
+Deleting individual entries is not secure erasure. Pause prevents
 future capture; it does not remove existing data. The Windows clipboard-monitor
 exclusion format is respected when present, but this is not a general secret
 detector. Use only where persistent clipboard retention is permitted.
@@ -111,7 +130,7 @@ uses the installed Desktop Runtime; to package the runtime, publish with
 
 ### Windows
 
-Run `.\restart.ps1` in PowerShell to stop Dito in your session, publish a slim
+Run `.\scripts\restart.ps1` in PowerShell to stop Dito in your session, publish a slim
 Release build, and start `artifacts\Dito\Dito.exe`. This needs the SDK to build,
 and the .NET 10 Desktop Runtime to run. Both local builds and GitHub releases
 bundle SQLite with FTS5; only GitHub releases also bundle .NET.
@@ -183,7 +202,8 @@ existing tag; it builds that tag, not `main`.
 
 ### Measured 100,000-entry results
 
-Measured in Release on Windows 10 x64, .NET 10.0.14, with a warm OS file cache.
+Baseline measured before label search was added, in Release on Windows 10 x64,
+.NET 10.0.14, with a warm OS file cache.
 The synthetic clips contain 82-1,608 characters (584 average), including code,
 multiline text, whitespace, and Unicode. The checkpointed database was 221 MiB.
 These are local measurements, not guaranteed latency limits.

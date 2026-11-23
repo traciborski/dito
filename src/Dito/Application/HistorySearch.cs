@@ -31,6 +31,14 @@ internal sealed class HistorySearch : IDisposable
     public event Action<string>? PreviewChanged;
     public event Action<string>? Failed;
 
+    public bool IsChanging { get; private set; }
+
+    public Task DeleteEntryAsync(long id) => ChangeEntryAsync(
+        () => _history.DeleteEntryAsync(id), "The entry could not be deleted. Check history access.");
+
+    public Task SetLabelAsync(long id, string label) => ChangeEntryAsync(
+        () => _history.SetLabelAsync(id, label), "The label could not be saved. Check history access.");
+
     public void Search(string query, bool debounce = true)
     {
         _query = query;
@@ -83,6 +91,36 @@ internal sealed class HistorySearch : IDisposable
     {
         _disposed = true;
         Cancel();
+    }
+
+    private async Task ChangeEntryAsync(Func<Task<bool>> change, string failure)
+    {
+        if (_disposed || IsChanging)
+        {
+            return;
+        }
+
+        var version = _version;
+        IsChanging = true;
+        try
+        {
+            await change();
+            if (!_disposed && version == _version)
+            {
+                Search(_query, debounce: false);
+            }
+        }
+        catch (Exception)
+        {
+            if (!_disposed && version == _version)
+            {
+                Failed?.Invoke(failure);
+            }
+        }
+        finally
+        {
+            IsChanging = false;
+        }
     }
 
     private void BeginSearch(long? cursor, int pageIndex, bool debounce)

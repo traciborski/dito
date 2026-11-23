@@ -1,3 +1,4 @@
+import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
@@ -56,6 +57,11 @@ export async function run() {
     }
     const id = menu._rows[0].id;
     check(await history.send({operation: 'read', id}) === text, 'Capture did not preserve exact text');
+    menu._label.set_text('Example email');
+    menu._saveLabel();
+    await until(async () => (await readPage('example ema')).items[0]?.id === id, 'save searchable label');
+    menu._entry.set_text('example ema');
+    await until(() => menu._rows[0]?.id === id && menu._preview.text.includes('first line'), 'search by label');
     await menu._copySelected();
     check(!menu.menu.isOpen, 'Recall did not close the popup');
     check(await readSyntheticClipboard() === text, 'Recall did not offer exact clipboard text');
@@ -72,6 +78,7 @@ export async function run() {
     setSyntheticClipboard(text);
     await until(async () => (await readPage()).items[0].id === id, 'external recopy updates recency');
     check((await readPage()).items.length === 3, 'External recopy duplicated an entry');
+    check((await readPage('example ema')).items[0]?.id === id, 'Recopy discarded the label');
 
     const clipboardClient = Gio.SubprocessLauncher.new(Gio.SubprocessFlags.STDIN_PIPE);
     clipboardClient.setenv('WAYLAND_DISPLAY', 'gnome-shell-test-display', true);
@@ -98,6 +105,18 @@ export async function run() {
     extension.enable();
     await until(async () => (await extension._history.send({operation: 'search', query: ''})).items.length === 4,
         'history persisted after restarting extension');
+    const reopened = extension._menu;
+    reopened.menu.open();
+    reopened._entry.set_text('example ema');
+    await until(() => reopened._rows[0]?.id === id, 'label persisted after restarting extension');
+    const deletePress = {
+        type: () => Clutter.EventType.KEY_PRESS,
+        get_key_symbol: () => Clutter.KEY_Delete,
+        get_state: () => 0,
+    };
+    check(reopened._onDeleteKey(deletePress) === Clutter.EVENT_STOP, 'Delete passed through to the search box');
+    await until(() => reopened._status.text === 'No matching entries.', 'Delete removed the selected result');
+    check(await extension._history.send({operation: 'read', id}) === null, 'Deleted entry could still be recalled');
     extension.disable();
     console.log('Dito GNOME smoke test passed.');
 }

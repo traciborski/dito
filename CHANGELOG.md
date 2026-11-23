@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- Delete the selected history entry immediately with Delete or **Delete entry**.
+- Give an entry an optional label and find it by that label using regular search.
+- Do not offer an empty Older page when results end on a full page.
+- Existing history is upgraded in place. Dito 0.2.0 and older cannot read the
+  upgraded database.
+
 ## 0.2.0
 
 - Add `Dito.Gnome`, a GNOME Shell 50 extension for Wayland clipboard capture and

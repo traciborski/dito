@@ -8,8 +8,9 @@
   traffic or telemetry. Other Wayland desktops and macOS are not supported.
 - Start manually; one instance per user per Windows session or X11 display.
   No startup registration, synchronization, encryption, pinning, standalone images,
-  deletion, or automatic pruning.
-  Keep all unique entries; 100,000 is a performance target, not a retention limit.
+  bulk deletion, or automatic pruning.
+  Keep unique entries until individually deleted; 100,000 is a performance target,
+  not a retention limit.
 - Release from a `vMAJOR.MINOR.PATCH` Git tag. The tag sets the build version;
   the matching `CHANGELOG.md` section supplies release notes.
   Publish self-contained Windows x64 and Arm64 ZIPs and Linux x64 and Arm64
@@ -27,8 +28,8 @@
   failure, warn and leave the tray usable. Save the foreground target before showing
   the popup; reopening an already visible popup only refocuses search.
 - Opening a hidden popup starts at newest history with the search box focused.
-  Rows show flattened text only, with subtle alternating backgrounds except in
-  high-contrast mode. No dates or populated-page count. The selected entry has a
+  Rows show an optional label followed by flattened text, with subtle alternating
+  backgrounds except in high-contrast mode. No dates or populated-page count. The selected entry has a
   read-only original plain-text preview. Distinguish empty history from no matches.
 - Up/Down selects; PageUp/PageDown or Newer/Older changes page. Select the first row
   of a loaded page. Escape, closing the popup, or losing focus hides it.
@@ -86,12 +87,27 @@
 - Schema v2 (`PRAGMA user_version`) adds nullable HTML/RTF BLOBs to v1 without
   changing existing data or FTS. Deduplicate using binary equality of plain text.
   Recopies keep the ID and first-copy time, replace formatting (including clearing
-  it for plain copies), and update last-copy time and monotonic `copy_order`.
+  it for plain copies), preserve the label, and update last-copy time and monotonic
+  `copy_order`. The existing row moves to the top of recent history and matching results.
   Timestamps are UTC Unix milliseconds. Recall does not reorder entries.
+- Schema v3 adds nullable labels, a label index, delete triggers, and a persistent
+  sequence so deleting rows does not reuse their IDs or move copy order backwards.
+- In each history popup, Delete or **Delete entry** immediately removes the
+  selected row and its search entries without confirmation or undo. Delete works
+  from the search field, but edits text normally in the label field. Holding the
+  key does not delete additional entries. Deletion does not clear the current
+  system clipboard or prevent a later external copy from being captured.
+- Set one optional label per entry in the label field and use **Save label** or
+  Enter while editing. Trim surrounding whitespace; saving an empty label
+  clears it. Labels need not be unique. Display the label in the result row but
+  preview and recall the original clip only. Editing the label does not reorder
+  the entry. After deletion or a label edit, reload the first page of the current query.
 - Keep plain text immutable and index it on insert in the same transaction. Use
   external-content FTS5 with `unicode61` and 2/3/4-character prefix indexes.
   Search splits on whitespace, quotes and escapes literal terms, ANDs them, and
-  allows a prefix on the final term only. Bind the MATCH expression as a parameter.
+  allows a prefix on the final term only. All terms must match the clip text or
+  all must match its label; matches across both fields are not combined. Bind the
+  MATCH expression as a parameter.
   Matching follows the tokenizer's case, diacritic, and punctuation rules, not
   arbitrary substring matching. Blank queries bypass FTS.
 - Debounce typing 150 ms. Cancel obsolete searches/previews and discard stale

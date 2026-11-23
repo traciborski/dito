@@ -50,6 +50,68 @@ public sealed class HistoryStoreTests
     }
 
     [Fact]
+    public async Task LabelsAreSearchableAndSurviveRecopyAndReopenWithoutChangingText()
+    {
+        await using var database = new TestDatabase();
+        var now = DateTimeOffset.UtcNow;
+        await database.Store.InitializeAsync();
+        var address = await database.Store.RecordCopyAsync("alice@example.com", now);
+        var other = await database.Store.RecordCopyAsync("work email note", now);
+        Assert.True(await database.Store.SetLabelAsync(address, " Work Email "));
+        Assert.True(await database.Store.SetLabelAsync(other, "Work Email"));
+
+        var matches = (await database.Store.SearchAsync("work ema")).Items;
+        Assert.Equal(new[] { other, address }, matches.Select(item => item.Id));
+        Assert.Empty((await database.Store.SearchAsync("example work")).Items);
+        Assert.Equal(address, await database.Store.RecordCopyAsync("alice@example.com", now));
+        await database.Store.DisposeAsync();
+
+        await using var reopened = new HistoryStore(database.Path);
+        await reopened.InitializeAsync();
+        var labelled = (await reopened.SearchAsync("WORK EM")).Items[0];
+        Assert.Equal(address, labelled.Id);
+        Assert.Equal("Work Email", labelled.Label);
+        Assert.Equal("alice@example.com", await reopened.ReadTextAsync(address));
+
+        Assert.True(await reopened.SetLabelAsync(address, "Personal"));
+        Assert.Equal(other, Assert.Single((await reopened.SearchAsync("work email")).Items).Id);
+        Assert.Equal(address, Assert.Single((await reopened.SearchAsync("personal")).Items).Id);
+        Assert.True(await reopened.SetLabelAsync(address, " \t "));
+        Assert.Empty((await reopened.SearchAsync("personal")).Items);
+        Assert.Null(Assert.Single((await reopened.SearchAsync("alice")).Items).Label);
+    }
+
+    [Fact]
+    public async Task DeletingRemovesBothSearchMatchesAndRecopyCreatesAnUnlabelledEntry()
+    {
+        await using var database = new TestDatabase();
+        await database.Store.InitializeAsync();
+        var now = DateTimeOffset.UtcNow;
+        var id = await database.Store.RecordCopyAsync(new ClipboardContent("original", "html"u8.ToArray()), now);
+        await database.Store.SetLabelAsync(id, "shortcut");
+        var order = Assert.Single((await database.Store.SearchAsync("")).Items).CopyOrder;
+
+        Assert.True(await database.Store.DeleteEntryAsync(id));
+        Assert.False(await database.Store.DeleteEntryAsync(id));
+        Assert.Null(await database.Store.ReadFormattedAsync(id));
+        Assert.Empty((await database.Store.SearchAsync("original")).Items);
+        Assert.Empty((await database.Store.SearchAsync("shortcut")).Items);
+        Assert.Empty((await database.Store.SearchAsync("")).Items);
+
+        await database.Store.DisposeAsync();
+        await using var reopened = new HistoryStore(database.Path);
+        await reopened.InitializeAsync();
+        var replacement = await reopened.RecordCopyAsync("original", now);
+        var entry = Assert.Single((await reopened.SearchAsync("original")).Items);
+        Assert.NotEqual(id, replacement);
+        Assert.Equal(replacement, entry.Id);
+        Assert.True(entry.CopyOrder > order);
+        Assert.Null(entry.Label);
+        Assert.False(await reopened.SetLabelAsync(id, "stale"));
+        Assert.Empty((await reopened.SearchAsync("shortcut")).Items);
+    }
+
+    [Fact]
     public async Task DeduplicationDoesNotNormalizeCaseWhitespaceOrUnicode()
     {
         await using var database = new TestDatabase();
@@ -139,6 +201,27 @@ public sealed class HistoryStoreTests
         Assert.Equal(ids, actualIds);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("item")]
+    public async Task DeletingTheOnlyEntryOnTheOlderPageRemovesItsCursor(string query)
+    {
+        await using var database = new TestDatabase();
+        await database.Store.InitializeAsync();
+        var now = DateTimeOffset.UtcNow;
+        var oldest = await database.Store.RecordCopyAsync("item oldest", now);
+        for (var index = 0; index < 100; index++)
+        {
+            await database.Store.RecordCopyAsync($"item {index}", now);
+        }
+
+        Assert.NotNull((await database.Store.SearchAsync(query)).NextCursor);
+        Assert.True(await database.Store.DeleteEntryAsync(oldest));
+        var page = await database.Store.SearchAsync(query);
+        Assert.Equal(100, page.Items.Count);
+        Assert.Null(page.NextCursor);
+    }
+
     [Fact]
     public async Task SearchIndexSurvivesReopening()
     {
@@ -225,7 +308,7 @@ public sealed class HistoryStoreTests
             command.CommandText = """
                 CREATE TABLE sentinel (value TEXT);
                 INSERT INTO sentinel VALUES ('keep');
-                PRAGMA user_version = 3;
+                PRAGMA user_version = 4;
                 """;
             command.ExecuteNonQuery();
         }

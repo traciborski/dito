@@ -6,7 +6,7 @@ namespace Dito.Storage;
 internal sealed class HistoryStore : IAsyncDisposable
 {
     private const int PageSize = 100;
-    private const int SchemaVersion = 2;
+    private const int SchemaVersion = 3;
 
     private readonly string _databasePath;
     private readonly SemaphoreSlim _gate = new(1, 1);
@@ -53,6 +53,12 @@ internal sealed class HistoryStore : IAsyncDisposable
     {
         return RunAsync(() => ReadText(id), cancellationToken);
     }
+
+    public Task<bool> DeleteEntryAsync(long id) =>
+        RunAsync(() => DeleteEntry(id), CancellationToken.None);
+
+    public Task<bool> SetLabelAsync(long id, string? label) =>
+        RunAsync(() => SetLabel(id, label), CancellationToken.None);
 
     public Task<ClipboardContent?> ReadFormattedAsync(long id, CancellationToken cancellationToken = default)
     {
@@ -188,6 +194,39 @@ internal sealed class HistoryStore : IAsyncDisposable
             command.ExecuteNonQuery();
         }
 
+        if (version < 3)
+        {
+            command.CommandText = """
+                ALTER TABLE clips ADD COLUMN label TEXT;
+
+                CREATE TABLE history_sequence (value INTEGER NOT NULL);
+                INSERT INTO history_sequence
+                    SELECT MAX(COALESCE(MAX(id), 0), COALESCE(MAX(copy_order), 0)) FROM clips;
+
+                CREATE VIRTUAL TABLE labels_fts USING fts5(
+                    label, tokenize = 'unicode61', prefix = '2 3 4'
+                );
+
+                CREATE TRIGGER clips_sequence_after_insert AFTER INSERT ON clips BEGIN
+                    UPDATE history_sequence SET value = new.copy_order;
+                END;
+                CREATE TRIGGER clips_sequence_after_recopy AFTER UPDATE OF copy_order ON clips BEGIN
+                    UPDATE history_sequence SET value = new.copy_order;
+                END;
+                CREATE TRIGGER clips_after_label_change AFTER UPDATE OF label ON clips BEGIN
+                    DELETE FROM labels_fts WHERE rowid = old.id;
+                    INSERT INTO labels_fts(rowid, label) SELECT new.id, new.label WHERE new.label IS NOT NULL;
+                END;
+                CREATE TRIGGER clips_after_delete AFTER DELETE ON clips BEGIN
+                    INSERT INTO clips_fts(clips_fts, rowid, text) VALUES ('delete', old.id, old.text);
+                    DELETE FROM labels_fts WHERE rowid = old.id;
+                END;
+
+                PRAGMA user_version = 3;
+                """;
+            command.ExecuteNonQuery();
+        }
+
         transaction.Commit();
     }
 
@@ -196,13 +235,10 @@ internal sealed class HistoryStore : IAsyncDisposable
         using var command = Connection.CreateCommand();
         command.CommandText = """
             INSERT INTO clips (
-                text, first_copied_utc_ms, last_copied_utc_ms, copy_order, html, rtf
+                id, text, first_copied_utc_ms, last_copied_utc_ms, copy_order, html, rtf
             )
-            VALUES (
-                $text, $now, $now,
-                (SELECT COALESCE(MAX(copy_order), 0) + 1 FROM clips),
-                $html, $rtf
-            )
+            SELECT value + 1, $text, $now, $now, value + 1, $html, $rtf
+            FROM history_sequence WHERE true
             ON CONFLICT(text) DO UPDATE SET
                 last_copied_utc_ms = excluded.last_copied_utc_ms,
                 copy_order = excluded.copy_order,
@@ -217,6 +253,25 @@ internal sealed class HistoryStore : IAsyncDisposable
         return (long)command.ExecuteScalar()!;
     }
 
+    private bool DeleteEntry(long id)
+    {
+        using var command = Connection.CreateCommand();
+        command.CommandText = "DELETE FROM clips WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", id);
+        return command.ExecuteNonQuery() != 0;
+    }
+
+    private bool SetLabel(long id, string? label)
+    {
+        label = label?.Trim();
+        using var command = Connection.CreateCommand();
+        command.CommandText = "UPDATE clips SET label = $label WHERE id = $id;";
+        command.Parameters.AddWithValue("$id", id);
+        command.Parameters.Add("$label", SqliteType.Text).Value =
+            string.IsNullOrEmpty(label) ? DBNull.Value : label;
+        return command.ExecuteNonQuery() != 0;
+    }
+
     private HistoryPage ReadPage(string match, long? beforeCopyOrder)
     {
         using var command = CreatePageCommand(match, beforeCopyOrder);
@@ -225,16 +280,20 @@ internal sealed class HistoryStore : IAsyncDisposable
 
         while (reader.Read())
         {
+            if (items.Count == PageSize)
+            {
+                return new HistoryPage(items, items[^1].CopyOrder);
+            }
+
             items.Add(new HistoryListItem(
                 reader.GetInt64(0),
                 reader.GetInt64(1),
                 DateTimeOffset.FromUnixTimeMilliseconds(reader.GetInt64(2)),
-                reader.GetString(3)));
+                reader.GetString(3),
+                reader.IsDBNull(4) ? null : reader.GetString(4)));
         }
 
-        return new HistoryPage(
-            items,
-            items.Count == PageSize ? items[^1].CopyOrder : null);
+        return new HistoryPage(items, null);
     }
 
     private SqliteCommand CreatePageCommand(string match, long? beforeCopyOrder)
@@ -247,7 +306,13 @@ internal sealed class HistoryStore : IAsyncDisposable
         {
             // Avoid fetching every matching text before sorting a broad prefix search.
             source = "clips INDEXED BY clips_recent";
-            conditions.Add("clips.id IN (SELECT rowid FROM clips_fts WHERE clips_fts MATCH $match)");
+            conditions.Add("""
+                clips.id IN (
+                    SELECT rowid FROM clips_fts WHERE clips_fts MATCH $match
+                    UNION ALL
+                    SELECT rowid FROM labels_fts WHERE labels_fts MATCH $match
+                )
+                """);
             command.Parameters.AddWithValue("$match", match);
         }
 
@@ -262,13 +327,14 @@ internal sealed class HistoryStore : IAsyncDisposable
             SELECT clips.id,
                    clips.copy_order,
                    clips.last_copied_utc_ms,
-                   substr(clips.text, 1, 240)
+                   substr(clips.text, 1, 240),
+                   clips.label
             FROM {source}
             {filter}
             ORDER BY clips.copy_order DESC
             LIMIT $pageSize;
             """;
-        command.Parameters.AddWithValue("$pageSize", PageSize);
+        command.Parameters.AddWithValue("$pageSize", PageSize + 1);
         return command;
     }
 

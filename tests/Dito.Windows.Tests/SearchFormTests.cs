@@ -78,6 +78,45 @@ public sealed class SearchFormTests
     }
 
     [Fact]
+    public async Task DeleteRemovesOnlyTheSelectedEntryEvenIfTheKeyRepeats()
+    {
+        await using var database = new TestDatabase();
+        await database.Store.InitializeAsync();
+        var remaining = await database.Store.RecordCopyAsync("remaining", DateTimeOffset.UtcNow);
+        var selected = await database.Store.RecordCopyAsync("selected", DateTimeOffset.UtcNow);
+
+        await WinFormsTest.RunAsync(async () =>
+        {
+            using var search = new HistorySearch(database.Store);
+            using var form = new SearchForm(search);
+            var query = WinFormsTest.Descendants(form).OfType<TextBox>()
+                .Single(control => control.AccessibleName == "Search clipboard history");
+            var loaded = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var refreshed = new TaskCompletionSource<SearchResults>(TaskCreationOptions.RunContinuationsAsynchronously);
+            search.ResultsChanged += results =>
+            {
+                if (results.Items.Count == 2)
+                {
+                    loaded.TrySetResult();
+                }
+                else
+                {
+                    refreshed.TrySetResult(results);
+                }
+            };
+            search.Search("", debounce: false);
+            await loaded.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            Assert.True(PreprocessDelete(query));
+            var results = await refreshed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.Equal(remaining, Assert.Single(results.Items).Id);
+            Assert.True(PreprocessDelete(query, repeat: true));
+            Assert.Null(await database.Store.ReadTextAsync(selected));
+            Assert.Equal("remaining", await database.Store.ReadTextAsync(remaining));
+        });
+    }
+
+    [Fact]
     public async Task ResultRowsAlternateWithoutOverridingSelection()
     {
         await using var database = new TestDatabase();
@@ -179,6 +218,12 @@ public sealed class SearchFormTests
     {
         return (bool)typeof(Form).GetMethod("ProcessCmdKey", BindingFlags.NonPublic | BindingFlags.Instance)!
             .Invoke(form, [default(Message), keys])!;
+    }
+
+    private static bool PreprocessDelete(Control control, bool repeat = false)
+    {
+        var message = Message.Create(control.Handle, 0x0100, (nint)Keys.Delete, repeat ? 1 << 30 : 0);
+        return control.PreProcessMessage(ref message);
     }
 
     private static void RaiseDoubleClick(ListBox control, Point location)
