@@ -11,8 +11,10 @@
   bulk deletion, or automatic pruning.
   Keep unique entries until individually deleted; 100,000 is a performance target,
   not a retention limit.
-- Release from a `vMAJOR.MINOR.PATCH` Git tag. The tag sets the build version;
-  the matching `CHANGELOG.md` section supplies release notes.
+- Release automatically when `version.yaml` is added or bumped on `main`.
+  `MAJOR.MINOR` means `MAJOR.MINOR.0`; the matching `CHANGELOG.md` section
+  supplies release notes. Tag the built commit `vMAJOR.MINOR.PATCH` only after
+  both packaging jobs succeed.
   Publish self-contained Windows x64 and Arm64 ZIPs and Linux x64 and Arm64
   tar.gz archives and GNOME extension ZIPs with bundled SQLite and .NET.
   Linux needs system desktop libraries.

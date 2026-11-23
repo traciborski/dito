@@ -2,61 +2,92 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing version tag to publish (for example v0.1.0)
-        required: true
-        type: string
+    branches: [main]
+    paths: [version.yaml]
 
 permissions:
   contents: read
 
-env:
-  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
-
 jobs:
-  package:
-    runs-on: windows-latest
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v6
         with:
-          ref: refs/tags/${{ env.RELEASE_TAG }}
+          fetch-depth: 0
+
+      - name: Check version bump and extract release notes
+        id: version
+        shell: pwsh
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+
+          function Read-Version([string] $content) {
+            if ($content.Trim() -cnotmatch '^version:[ \t]+"(?<number>(0|[1-9][0-9]*)(\.(0|[1-9][0-9]*)){1,2})"$') {
+              throw 'version.yaml must contain version: "MAJOR.MINOR" or version: "MAJOR.MINOR.PATCH".'
+            }
+            $number = $Matches.number
+            if ($number.Split('.').Length -eq 2) { $number += '.0' }
+            return [version] $number
+          }
+
+          $version = Read-Version (Get-Content .\version.yaml -Raw)
+          if ($env:BEFORE_SHA -notmatch '^0+$' -and (git ls-tree $env:BEFORE_SHA -- version.yaml)) {
+            $previous = Read-Version ((git show "${env:BEFORE_SHA}:version.yaml") -join "`n")
+            if ($version -eq $previous) { exit 0 }
+            if ($version -lt $previous) { throw "Version must increase ($previous -> $version)." }
+          }
+
+          $heading = [regex]::Escape($version)
+          $changelog = Get-Content .\CHANGELOG.md -Raw
+          $notes = [regex]::Match($changelog, "(?ms)^## $heading[ \t]*\r?\n(.*?)(?=^## |\z)").Groups[1].Value.Trim()
+          if (!$notes) { throw "CHANGELOG.md needs a nonempty section headed '## $version'." }
+
+          Set-Content -Path notes.md -Value $notes -Encoding utf8
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "version=$version" -Encoding utf8
+
+      - uses: actions/upload-artifact@v4
+        if: steps.version.outputs.version != ''
+        with:
+          name: release-notes
+          path: notes.md
+          if-no-files-found: error
+
+  package:
+    needs: prepare
+    if: needs.prepare.outputs.version != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_TAG: v${{ needs.prepare.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '10.0.x'
 
-      - name: Validate tag and extract release notes
+      - name: Test shared core
         shell: pwsh
-        run: |
-          if ($env:RELEASE_TAG -cnotmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
-            throw 'Release tags must be vMAJOR.MINOR.PATCH.'
-          }
-          $version = $env:RELEASE_TAG.Substring(1)
-          $changelog = Get-Content .\CHANGELOG.md -Raw
-          $heading = [regex]::Escape($version)
-          $section = [regex]::Match($changelog, "(?ms)^## $heading[ \t]*\r?\n(.*?)(?=^## |\z)")
-          $notes = $section.Groups[1].Value.Trim()
-          if (!$notes) {
-            throw "CHANGELOG.md needs a nonempty section headed '## $version'."
-          }
-          New-Item -ItemType Directory -Path .\release | Out-Null
-          Set-Content -Path .\release\notes.md -Value $notes -Encoding utf8
-          Add-Content -Path $env:GITHUB_ENV -Value "RELEASE_VERSION=$version" -Encoding utf8
+        run: dotnet test (Join-Path tests Dito.Tests) -c Release "-p:Version=$env:RELEASE_VERSION" --filter "Category!=Performance"
 
-      - name: Test release build
+      - name: Test Windows
+        if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          foreach ($project in 'Dito.Tests', 'Dito.Windows.Tests') {
-            dotnet test ".\tests\$project\$project.csproj" -c Release "-p:Version=$env:RELEASE_VERSION" --filter "Category!=Performance"
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
+        run: dotnet test .\tests\Dito.Windows.Tests -c Release "-p:Version=$env:RELEASE_VERSION" --filter "Category!=Performance"
 
       - name: Publish self-contained Windows archives
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          New-Item -ItemType Directory -Path .\release | Out-Null
           foreach ($rid in 'win-x64', 'win-arm64') {
             $publishDir = ".\publish\$rid"
             dotnet publish .\src\Dito.Windows\Dito.Windows.csproj -c Release -r $rid --self-contained true "-p:Version=$env:RELEASE_VERSION" -o $publishDir
@@ -64,36 +95,12 @@ jobs:
             Compress-Archive -Path "$publishDir\*" -DestinationPath ".\release\Dito-$env:RELEASE_TAG-$rid.zip"
           }
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-windows
-          path: release/
-          if-no-files-found: error
-
-  package-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          ref: refs/tags/${{ env.RELEASE_TAG }}
-      - uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: '10.0.x'
-
-      - name: Validate tag
-        run: |
-          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
-            echo 'Release tags must be vMAJOR.MINOR.PATCH.' >&2
-            exit 1
-          fi
-          echo "RELEASE_VERSION=${RELEASE_TAG#v}" >> "$GITHUB_ENV"
-
-      - name: Test release build
-        run: |
-          dotnet test tests/Dito.Tests -c Release "-p:Version=$RELEASE_VERSION" --filter "Category!=Performance"
-          dotnet test tests/Dito.X11.Tests -c Release "-p:Version=$RELEASE_VERSION"
+      - name: Test X11
+        if: runner.os == 'Linux'
+        run: dotnet test tests/Dito.X11.Tests -c Release "-p:Version=$RELEASE_VERSION"
 
       - name: Publish native X11 and GNOME archives
+        if: runner.os == 'Linux'
         run: |
           mkdir -p release
           for rid in linux-x64 linux-arm64; do
@@ -105,16 +112,19 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: release-linux
+          name: release-${{ runner.os }}
           path: release/
           if-no-files-found: error
 
   release:
-    needs: [package, package-linux]
+    needs: [prepare, package]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      RELEASE_TAG: v${{ needs.prepare.outputs.version }}
     steps:
+      - uses: actions/checkout@v6
       - uses: actions/download-artifact@v5
         with:
           pattern: release-*
@@ -124,6 +134,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          git push origin "$GITHUB_SHA:refs/tags/$RELEASE_TAG"
           gh release create "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "Dito $RELEASE_TAG" --notes-file notes.md \

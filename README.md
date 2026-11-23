@@ -184,21 +184,18 @@ performance test.
 ### Release process
 
 1. Move pending notes from `Unreleased` to `## MAJOR.MINOR.PATCH` in `CHANGELOG.md`.
-   Commit the notes and any matching `SPEC.md` changes and push `main`.
-2. Tag that commit and push the tag, for example:
+2. Bump `version.yaml` in the same change and land it on `main`. For example:
 
-   ```powershell
-   git tag -a v0.1.1 -m "Dito 0.1.1"
-   git push origin v0.1.1
+   ```yaml
+   version: "0.3"
    ```
 
-The Release workflow derives the build version from the tag, runs the core and
-matching app tests on each OS, and publishes Windows ZIPs, native X11 tar.gz
-archives, and GNOME extension ZIPs with the matching release notes. There is no project
-version to bump; local builds use the .NET SDK default (`1.0.0`) unless you pass
-`-p:Version=...`. Do not reuse a released version or tag.
-If the tag push did not start a run, dispatch **Release** from `main` and enter the
-existing tag; it builds that tag, not `main`.
+This example builds `0.3.0` and uses the `## 0.3.0` notes. The Release workflow
+runs the core and matching app tests on each OS and packages Windows ZIPs, native
+X11 tar.gz archives, and GNOME extension ZIPs. Once packaging passes, it tags the
+built commit `v0.3.0` and publishes the GitHub release. No manual tag is needed.
+If the workflow fails, rerun it from Actions. Local builds still use the .NET SDK
+default (`1.0.0`) unless you pass `-p:Version=...`.
 
 ### Measured 100,000-entry results
 
