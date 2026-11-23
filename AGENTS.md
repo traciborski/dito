@@ -85,9 +85,8 @@ mediator, DI container, event bus, plugin system, or speculative image abstracti
 - Use `Microsoft.Data.Sqlite` with FTS5 support and pin a compatible stable version.
   Prefer framework APIs for everything else unless a dependency solves a concrete
   requirement.
-- Do not build generic infrastructure for possible future features. Standalone images,
-  encryption, startup registration, and deletion are outside the current scope.
-- No capture-count cap, expiry, automatic pruning, or Clear History command.
+- Build only for the features in scope for the change. See [SPEC.md](SPEC.md)
+  for supported features and history retention.
 - Do not claim that locally written software or unencrypted local storage is
   automatically permitted by an employer.
 
@@ -105,6 +104,5 @@ mediator, DI container, event bus, plugin system, or speculative image abstracti
 - Measure the specified 100,000-entry workflow before claiming the performance
   target is met. Do not optimize speculatively ahead of measurements.
 - State what changed, what was verified, and any unverified desktop interaction.
-- For a release, add the matching `CHANGELOG.md` section before tagging. The Git
-  tag sets the release build version; keep assembly version attributes SDK-generated.
-  Do not tag changes that are not ready to publish.
+- For releases, follow the [Release process](README.md#release-process).
+  Keep assembly version attributes SDK-generated.
