@@ -1,7 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
 if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
-    throw 'This restart script is for Dito on Windows.'
+    throw 'This install script is for Dito on Windows.'
 }
 
 $dotnet = (Get-Command dotnet -CommandType Application | Select-Object -First 1).Source

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Trim surrounding whitespace from new clipboard captures and skip empty results.
+  Existing history is unchanged. On Windows, trimmed clips are saved as plain text only.
+
 ## 0.3.0
 
 - Delete the selected history entry immediately with Delete or **Delete entry**.

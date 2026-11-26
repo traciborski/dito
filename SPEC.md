@@ -52,10 +52,10 @@
 - Use the tray menu on desktops with StatusNotifierItem support, or use
   `--show` and the window buttons to pause/resume capture or exit.
 - Watch changes to the X11 `CLIPBOARD` selection with XFixes. Capture only
-  nonempty external text, ignoring marked Dito writes. Rapid or superseded
-  changes may be skipped; do not save stale reads or record clipboard changes
-  from while capture was paused. Linux does not capture HTML/RTF or interpret
-  the Windows clipboard-monitor exclusion format.
+  external text that is nonempty after trimming, ignoring marked Dito writes.
+  Rapid or superseded changes may be skipped; do not save stale reads or record
+  clipboard changes from while capture was paused. Linux does not capture
+  HTML/RTF or interpret the Windows clipboard-monitor exclusion format.
 - Store history in `$XDG_DATA_HOME/dito/history.db` or, by default,
   `~/.local/share/dito/history.db`. Clipboard recall does not reorder entries.
 
@@ -68,7 +68,7 @@
   plain text asynchronously, discards superseded reads, and ignores its own
   recall by selection-owner identity. No automatic paste or rich-text capture.
 - Open the panel menu to search, page, and preview. Copy or Enter offers the
-  original text and closes the popup; paste manually in the destination.
+  stored text and closes the popup; paste manually in the destination.
   Pause stops new capture. Disabling the extension stops monitoring.
 - The extension starts its bundled history helper on demand, communicates over
   private process pipes, and closes it on disable. No companion app is required.
@@ -78,17 +78,22 @@
 
 - On Windows, an explicitly created message-only HWND listens via `AddClipboardFormatListener`.
   Read on the STA thread. Ignore empty/non-text, monitor-excluded, and self-written
-  clipboard content; preserve whitespace, case, and line endings. Retry a busy
-  clipboard briefly and cancel superseded reads. The bounded capture queue drains
-  on exit; failures can pause capture rather than silently dropping history.
+  clipboard content. Retry a busy clipboard briefly and cancel superseded reads.
+  The bounded capture queue drains on exit; failures can pause capture rather
+  than silently dropping history.
+- On all platforms, trim leading and trailing whitespace before saving and skip
+  copies that become empty. Preserve case, interior whitespace, and interior line
+  endings. Do not change the system clipboard or existing rows as part of trimming.
+  On Windows, save only plain text when trimming changes it; otherwise keep any
+  captured HTML/RTF.
 - On Windows, store at `%LOCALAPPDATA%\Dito\history.db`. All frontends use WAL,
   bounded lock waits, and off-UI-thread database access with an explicitly owned,
   serialized connection.
   The database and sidecars are unencrypted. HTML/RTF can contain metadata or
   embedded content not shown in previews; Dito does not render these formats.
 - Schema v2 (`PRAGMA user_version`) adds nullable HTML/RTF BLOBs to v1 without
-  changing existing data or FTS. Deduplicate using binary equality of plain text.
-  Recopies keep the ID and first-copy time, replace formatting (including clearing
+  changing existing data or FTS. Deduplicate using binary equality of stored plain
+  text. Recopies keep the ID and first-copy time, replace formatting (including clearing
   it for plain copies), preserve the label, and update last-copy time and monotonic
   `copy_order`. The existing row moves to the top of recent history and matching results.
   Timestamps are UTC Unix milliseconds. Recall does not reorder entries.
@@ -102,7 +107,7 @@
 - Set one optional label per entry in the label field and use **Save label** or
   Enter while editing. Trim surrounding whitespace; saving an empty label
   clears it. Labels need not be unique. Display the label in the result row but
-  preview and recall the original clip only. Editing the label does not reorder
+  preview and recall the stored clip only. Editing the label does not reorder
   the entry. After deletion or a label edit, reload the first page of the current query.
 - Keep plain text immutable and index it on insert in the same transaction. Use
   external-content FTS5 with `unicode61` and 2/3/4-character prefix indexes.

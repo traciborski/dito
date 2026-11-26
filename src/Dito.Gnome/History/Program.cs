@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Dito.Application;
 using Dito.Storage;
 
 namespace Dito.Gnome.History;
@@ -56,9 +57,13 @@ internal static class Program
 
     private static async Task<object?> ExecuteAsync(HistoryStore history, Request request)
     {
-        if (request.Operation == "capture" && request.Text is { Length: > 0 } text)
+        if (request.Operation == "capture" && request.Text is { } text)
         {
-            await history.RecordCopyAsync(text, DateTimeOffset.FromUnixTimeMilliseconds(request.CopiedAt));
+            if (new ClipboardContent(text).TrimForCapture() is { } content)
+            {
+                await history.RecordCopyAsync(content, DateTimeOffset.FromUnixTimeMilliseconds(request.CopiedAt));
+            }
+
             return null;
         }
 

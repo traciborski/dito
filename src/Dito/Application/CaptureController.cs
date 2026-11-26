@@ -80,12 +80,12 @@ internal sealed class CaptureController
         {
             var content = await _clipboard.ReadAsync(sequence, cancellationToken);
             if (_paused || _stopping || cancellationToken.IsCancellationRequested ||
-                content is null || content.Text.Length == 0)
+                content?.TrimForCapture() is not { } trimmed)
             {
                 return;
             }
 
-            EnqueueCapture(content, copiedAt);
+            EnqueueCapture(trimmed, copiedAt);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {

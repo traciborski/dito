@@ -40,9 +40,11 @@ export async function run() {
     await until(() => Main.extensionManager.lookup(uuid)?.stateObj?._menu, 'extension activation');
     const extension = Main.extensionManager.lookup(uuid).stateObj;
     const { _history: history, _menu: menu } = extension;
-    const text = '  project caf\u00e9\r\nfirst line\0last line\t ';
+    const text = 'project caf\u00e9\r\nfirst line\0last line';
     const readPage = (query = '') => history.send({operation: 'search', query});
-    setSyntheticClipboard(text);
+    await history.send({operation: 'capture', text: ' \u00a0\t\r\n', copiedAt: Date.now()});
+    check((await readPage()).items.length === 0, 'Whitespace-only capture was saved');
+    setSyntheticClipboard(`  ${text}\t `);
     await until(async () => (await readPage()).items.length === 1, 'first capture');
     setSyntheticClipboard('newer synthetic clip');
     await until(async () => (await readPage()).items.length === 2, 'second capture');
@@ -56,7 +58,7 @@ export async function run() {
         throw new Error(`Popup had ${menu._rows.length} rows; status: ${menu._status.text}`, {cause: error});
     }
     const id = menu._rows[0].id;
-    check(await history.send({operation: 'read', id}) === text, 'Capture did not preserve exact text');
+    check(await history.send({operation: 'read', id}) === text, 'Capture did not trim just the surrounding whitespace');
     menu._label.set_text('Example email');
     menu._saveLabel();
     await until(async () => (await readPage('example ema')).items[0]?.id === id, 'save searchable label');

@@ -8,7 +8,20 @@ internal enum ClipboardReadStatus
     Superseded
 }
 
-internal sealed record ClipboardContent(string Text, byte[]? Html = null, byte[]? Rtf = null);
+internal sealed record ClipboardContent(string Text, byte[]? Html = null, byte[]? Rtf = null)
+{
+    public ClipboardContent? TrimForCapture()
+    {
+        var trimmed = Text.Trim();
+        if (trimmed.Length == 0)
+        {
+            return null;
+        }
+
+        // The original HTML and RTF may still contain the removed whitespace.
+        return trimmed.Length == Text.Length ? this : new ClipboardContent(trimmed);
+    }
+}
 
 internal sealed record ClipboardReadResult(ClipboardReadStatus Status, ClipboardContent? Content = null);
 

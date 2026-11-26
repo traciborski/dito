@@ -1,3 +1,4 @@
+using Dito.Application;
 using Dito.Storage;
 
 namespace Dito.X11;
@@ -61,9 +62,10 @@ internal sealed class ClipboardCapture(
         {
             var text = await readText();
             if (!cancellationToken.IsCancellationRequested && generation == _generation &&
-                current == revision() && !string.IsNullOrEmpty(text))
+                current == revision() && text is not null &&
+                new ClipboardContent(text).TrimForCapture() is { } content)
             {
-                await history.RecordCopyAsync(text, now);
+                await history.RecordCopyAsync(content, now);
             }
         }
         catch (Exception)

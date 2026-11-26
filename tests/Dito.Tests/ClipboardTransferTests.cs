@@ -93,4 +93,31 @@ public sealed class ClipboardTransferTests
         Assert.Equal(content.Html, saved.Html);
         Assert.Equal(content.Rtf, saved.Rtf);
     }
+
+    [Theory]
+    [InlineData("\u00a0 \r\nfirst line\r\n\tsecond line \t", "first line\r\n\tsecond line")]
+    [InlineData("\u00a0 \r\n\t", null)]
+    [InlineData("", null)]
+    public async Task CaptureTrimsPlainTextAndDiscardsFormattingWhenTextChanges(string text, string? expected)
+    {
+        await using var database = new TestDatabase();
+        await database.Store.InitializeAsync();
+        var content = new ClipboardContent(text, "<p>text</p>"u8.ToArray(), @"{\rtf1 text}"u8.ToArray());
+        var access = new FakeClipboard { ReadResult = new(ClipboardReadStatus.Text, content) };
+        var captures = new CaptureController(database.Store, new ClipboardTransfer(access));
+        captures.Start();
+        captures.ObserveClipboard();
+        await captures.StopAsync();
+
+        var entries = (await database.Store.SearchAsync("")).Items;
+        if (expected is null)
+        {
+            Assert.Empty(entries);
+        }
+        else
+        {
+            var entry = Assert.Single(entries);
+            Assert.Equal(new ClipboardContent(expected), await database.Store.ReadFormattedAsync(entry.Id));
+        }
+    }
 }

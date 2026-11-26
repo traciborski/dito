@@ -58,7 +58,7 @@ across every distro and window manager.
 Copy text in another app, then open history from the tray or by running
 `/absolute/path/to/Dito.X11 --show`. Set that command as a custom keyboard
 shortcut in your desktop settings. Search, use Up/Down and PageUp/PageDown to
-navigate, and press Enter or Ctrl+Enter to copy the original plain text and hide
+navigate, and press Enter or Ctrl+Enter to copy the stored plain text and hide
 history. Paste manually in the destination app. Keep Dito running until you've
 pasted; X11 clipboard data may not persist after Dito exits.
 
@@ -105,10 +105,14 @@ after the upgrade.
 History is saved to `%LOCALAPPDATA%\Dito\history.db` on Windows and
 `$XDG_DATA_HOME/dito/history.db` (default `~/.local/share/dito/history.db`) on Linux,
 with SQLite WAL sidecar files as needed. Unique entries are retained across
-restarts unless deleted. Copying identical text again from another app moves
-the existing entry to the top and replaces its saved formatting without adding
-another row or removing its label. Recalling an entry does not reorder it. Whitespace,
-case, and line endings are preserved.
+restarts unless deleted. Dito trims leading and trailing whitespace from new
+captures and skips text that becomes empty. Interior whitespace, case, and line
+endings stay as copied. This does not rewrite existing history or the system
+clipboard. On Windows, clips that need trimming are saved as plain text only.
+
+Copying text that matches a stored entry after trimming moves it to the top and
+replaces its saved formatting without adding a row or removing its label.
+Recalling an entry does not reorder it.
 
 **Storage is unencrypted and may retain secrets indefinitely.** HTML and RTF can
 also include source metadata or embedded content not shown in the preview. There
@@ -124,13 +128,14 @@ startup are not implemented.
 ## Development and validation
 
 See `SPEC.md` for behavior and architecture and `AGENTS.md` for coding standards.
-Building from source requires the .NET 10 SDK. The locally built Windows EXE
-uses the installed Desktop Runtime; to package the runtime, publish with
+Building from source requires a stable .NET 10 SDK. `global.json` selects the
+latest installed stable 10.0 SDK. The locally built Windows EXE uses the
+installed Desktop Runtime; to package the runtime, publish with
 `-r win-x64 --self-contained true` (or `-r win-arm64`).
 
 ### Windows
 
-Run `.\scripts\restart.ps1` in PowerShell to stop Dito in your session, publish a slim
+Run `.\scripts\install.ps1` in PowerShell to stop Dito in your session, publish a slim
 Release build, and start `artifacts\Dito\Dito.exe`. This needs the SDK to build,
 and the .NET 10 Desktop Runtime to run. Both local builds and GitHub releases
 bundle SQLite with FTS5; only GitHub releases also bundle .NET.

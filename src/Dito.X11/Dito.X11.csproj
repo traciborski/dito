@@ -8,8 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Avalonia.Desktop" Version="12.1.6" />
-    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.6" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.2.0" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.2.0" />
     <ProjectReference Include="..\Dito\Dito.csproj" />
     <EmbeddedResource Include="..\Dito.Windows\Dito.ico" LogicalName="Dito.ico" />
     <InternalsVisibleTo Include="Dito.X11.Tests" />
