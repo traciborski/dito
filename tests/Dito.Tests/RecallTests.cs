@@ -5,14 +5,16 @@ namespace Dito.Tests;
 public sealed class RecallTests
 {
     [Fact]
-    public async Task CopyOnlyPreservesOriginalTextAndDoesNotReorderOrInjectInput()
+    public async Task CopyOnlyMovesExistingEntryToTopWithoutChangingSavedDataOrInjectingInput()
     {
         await using var database = new TestDatabase();
         await database.Store.InitializeAsync();
         const string text = "  original\r\nsecond line\t ";
-        var id = await database.Store.RecordCopyAsync(
-            new ClipboardContent(text, "<b>original</b>"u8.ToArray()), DateTimeOffset.UtcNow);
-        var newestId = await database.Store.RecordCopyAsync("newer", DateTimeOffset.UtcNow);
+        var content = new ClipboardContent(text, "<b>original</b>"u8.ToArray(), @"{\rtf1 original}"u8.ToArray());
+        var copiedAt = DateTimeOffset.UnixEpoch;
+        var id = await database.Store.RecordCopyAsync(content, copiedAt);
+        await database.Store.SetLabelAsync(id, "example label");
+        var newestId = await database.Store.RecordCopyAsync("newer original", DateTimeOffset.UtcNow);
         var access = new FakeClipboard();
         var desktop = new FakeDesktop();
         var recall = CreateRecall(database, access, desktop);
@@ -26,7 +28,14 @@ public sealed class RecallTests
         Assert.Equal(text, access.WrittenText);
         Assert.Null(access.WrittenContent!.Html);
         Assert.Equal(0, desktop.PasteAttempts);
-        Assert.Equal(newestId, (await database.Store.SearchAsync("")).Items[0].Id);
+        var matches = (await database.Store.SearchAsync("original")).Items;
+        Assert.Equal(new[] { id, newestId }, matches.Select(item => item.Id));
+        Assert.Equal("example label", matches[0].Label);
+        Assert.Equal(copiedAt, matches[0].LastCopiedAt);
+        var saved = Assert.IsType<ClipboardContent>(await database.Store.ReadFormattedAsync(id));
+        Assert.Equal(text, saved.Text);
+        Assert.Equal(content.Html, saved.Html);
+        Assert.Equal(content.Rtf, saved.Rtf);
     }
 
     [Fact]
@@ -35,6 +44,7 @@ public sealed class RecallTests
         await using var database = new TestDatabase();
         await database.Store.InitializeAsync();
         var id = await database.Store.RecordCopyAsync("selected", DateTimeOffset.UtcNow);
+        var newestId = await database.Store.RecordCopyAsync("newer", DateTimeOffset.UtcNow);
         var access = new FakeClipboard { BusyWrites = int.MaxValue };
         var desktop = new FakeDesktop();
         var dismissed = false;
@@ -46,6 +56,7 @@ public sealed class RecallTests
         Assert.False(dismissed);
         Assert.Null(access.WrittenText);
         Assert.Equal(0, desktop.PasteAttempts);
+        Assert.Equal(newestId, (await database.Store.SearchAsync("")).Items[0].Id);
     }
 
     [Fact]
@@ -54,6 +65,7 @@ public sealed class RecallTests
         await using var database = new TestDatabase();
         await database.Store.InitializeAsync();
         var id = await database.Store.RecordCopyAsync("selected", DateTimeOffset.UtcNow);
+        await database.Store.RecordCopyAsync("newer", DateTimeOffset.UtcNow);
         var access = new FakeClipboard();
         var desktop = new FakeDesktop();
 
@@ -65,6 +77,7 @@ public sealed class RecallTests
         Assert.Null(access.WrittenContent!.Html);
         Assert.Null(access.WrittenContent.Rtf);
         Assert.Equal(0, desktop.PasteAttempts);
+        Assert.Equal(id, (await database.Store.SearchAsync("")).Items[0].Id);
     }
 
     [Theory]
@@ -76,6 +89,7 @@ public sealed class RecallTests
         await database.Store.InitializeAsync();
         var content = new ClipboardContent("selected", "<b>selected</b>"u8.ToArray(), @"{\rtf1\b selected}"u8.ToArray());
         var id = await database.Store.RecordCopyAsync(content, DateTimeOffset.UtcNow);
+        await database.Store.RecordCopyAsync("newer", DateTimeOffset.UtcNow);
         var access = new FakeClipboard();
         var desktop = new FakeDesktop();
         var dismissed = false;
@@ -94,6 +108,7 @@ public sealed class RecallTests
 
         Assert.Equal(RecallResult.Pasted, result);
         Assert.Equal(1, desktop.PasteAttempts);
+        Assert.Equal(id, (await database.Store.SearchAsync("")).Items[0].Id);
     }
 
     [Fact]
@@ -102,6 +117,7 @@ public sealed class RecallTests
         await using var database = new TestDatabase();
         await database.Store.InitializeAsync();
         var id = await database.Store.RecordCopyAsync("selected", DateTimeOffset.UtcNow);
+        var newestId = await database.Store.RecordCopyAsync("newer", DateTimeOffset.UtcNow);
         var access = new FakeClipboard();
         var desktop = new FakeDesktop();
 
@@ -111,6 +127,7 @@ public sealed class RecallTests
         Assert.Equal(RecallResult.ClipboardChanged, result);
         Assert.Equal(1, access.WriteAttempts);
         Assert.Equal(0, desktop.PasteAttempts);
+        Assert.Equal(newestId, (await database.Store.SearchAsync("")).Items[0].Id);
     }
 
     [Fact]

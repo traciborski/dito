@@ -140,7 +140,13 @@ internal sealed class LinuxApp(DesktopInstance instance) : Avalonia.Application
     {
         var text = await _history.ReadTextAsync(id, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
-        return text is not null && _clipboard is { } clipboard && await clipboard.CopyAsync(text);
+        if (text is null || _clipboard is not { } clipboard || !await clipboard.CopyAsync(text))
+        {
+            return false;
+        }
+
+        await _history.PromoteEntryAsync(id);
+        return true;
     }
 
     private void ToggleCapture()

@@ -64,11 +64,15 @@ export async function run() {
     await until(async () => (await readPage('example ema')).items[0]?.id === id, 'save searchable label');
     menu._entry.set_text('example ema');
     await until(() => menu._rows[0]?.id === id && menu._preview.text.includes('first line'), 'search by label');
+    check((await readPage()).items[0].id !== id, 'Preview changed history recency');
     await menu._copySelected();
     check(!menu.menu.isOpen, 'Recall did not close the popup');
     check(await readSyntheticClipboard() === text, 'Recall did not offer exact clipboard text');
     await sleep(250);
-    check((await readPage()).items[0].id !== id, 'Recall changed history recency');
+    const recalled = (await readPage()).items;
+    check(recalled[0].id === id, 'Recall did not move the entry to the top');
+    check(recalled.length === 2, 'Recall duplicated an entry');
+    check(recalled[0].label === 'Example email', 'Recall discarded the label');
 
     menu._setPaused(true);
     setSyntheticClipboard('must not be captured');

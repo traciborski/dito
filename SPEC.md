@@ -57,7 +57,7 @@
   clipboard changes from while capture was paused. Linux does not capture
   HTML/RTF or interpret the Windows clipboard-monitor exclusion format.
 - Store history in `$XDG_DATA_HOME/dito/history.db` or, by default,
-  `~/.local/share/dito/history.db`. Clipboard recall does not reorder entries.
+  `~/.local/share/dito/history.db`.
 
 ## Capture, storage, and search
 
@@ -96,7 +96,11 @@
   text. Recopies keep the ID and first-copy time, replace formatting (including clearing
   it for plain copies), preserve the label, and update last-copy time and monotonic
   `copy_order`. The existing row moves to the top of recent history and matching results.
-  Timestamps are UTC Unix milliseconds. Recall does not reorder entries.
+  Timestamps are UTC Unix milliseconds. On all platforms, successful recall
+  moves the existing row to the top of history and matching results without
+  changing its content, formatting, label, or copy timestamps. This includes
+  Windows recall that leaves text ready for manual paste. Preview alone does
+  not reorder entries.
 - Schema v3 adds nullable labels, a label index, delete triggers, and a persistent
   sequence so deleting rows does not reuse their IDs or move copy order backwards.
 - In each history popup, Delete or **Delete entry** immediately removes the

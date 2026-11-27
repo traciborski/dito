@@ -112,7 +112,9 @@ clipboard. On Windows, clips that need trimming are saved as plain text only.
 
 Copying text that matches a stored entry after trimming moves it to the top and
 replaces its saved formatting without adding a row or removing its label.
-Recalling an entry does not reorder it.
+Successfully recalling an entry (copy or paste) also moves it to the top, without
+changing its saved content or label. Highlighting an entry for preview does not
+reorder it.
 
 **Storage is unencrypted and may retain secrets indefinitely.** HTML and RTF can
 also include source metadata or embedded content not shown in the preview. There

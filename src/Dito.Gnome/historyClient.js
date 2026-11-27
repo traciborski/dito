@@ -21,7 +21,7 @@ export class HistoryClient {
         this._pending++;
         const generation = this._generation;
         const result = this._tail.then(() => {
-            if (!isCurrent() || (this._closed && request.operation !== 'capture'))
+            if (!isCurrent() || (this._closed && request.operation !== 'capture' && request.operation !== 'promote'))
                 return null;
             if (generation !== this._generation)
                 throw new Error('History service disconnected');

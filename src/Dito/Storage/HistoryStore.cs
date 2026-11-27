@@ -60,6 +60,9 @@ internal sealed class HistoryStore : IAsyncDisposable
     public Task<bool> SetLabelAsync(long id, string? label) =>
         RunAsync(() => SetLabel(id, label), CancellationToken.None);
 
+    public Task PromoteEntryAsync(long id) =>
+        RunAsync(() => PromoteEntry(id), CancellationToken.None);
+
     public Task<ClipboardContent?> ReadFormattedAsync(long id, CancellationToken cancellationToken = default)
     {
         return RunAsync(() => ReadFormatted(id), cancellationToken);
@@ -251,6 +254,16 @@ internal sealed class HistoryStore : IAsyncDisposable
         command.Parameters.Add("$html", SqliteType.Blob).Value = (object?)content.Html ?? DBNull.Value;
         command.Parameters.Add("$rtf", SqliteType.Blob).Value = (object?)content.Rtf ?? DBNull.Value;
         return (long)command.ExecuteScalar()!;
+    }
+
+    private int PromoteEntry(long id)
+    {
+        using var command = Connection.CreateCommand();
+        command.CommandText = """
+            UPDATE clips SET copy_order = (SELECT value + 1 FROM history_sequence) WHERE id = $id;
+            """;
+        command.Parameters.AddWithValue("$id", id);
+        return command.ExecuteNonQuery();
     }
 
     private bool DeleteEntry(long id)

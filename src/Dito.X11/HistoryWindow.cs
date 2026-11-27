@@ -287,7 +287,7 @@ internal sealed class HistoryWindow : Window
         }
         catch (Exception)
         {
-            ShowError("The selected text could not be copied. Check clipboard and database access.");
+            ShowError("Recall could not complete. Check the clipboard and history access.");
         }
         finally
         {

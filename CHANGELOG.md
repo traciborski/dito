@@ -4,6 +4,7 @@
 
 - Trim surrounding whitespace from new clipboard captures and skip empty results.
   Existing history is unchanged. On Windows, trimmed clips are saved as plain text only.
+- Move successfully copied or pasted history entries to the top on all platforms.
 
 ## 0.3.0
 
