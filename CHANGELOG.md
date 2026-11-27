@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
 
 - Import Unicode text history from a Ditto database backup with the Windows
   `--import-from-ditto` command, with an optional dry run.
