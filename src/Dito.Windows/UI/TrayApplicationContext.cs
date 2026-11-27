@@ -221,7 +221,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             if (!_shuttingDown)
             {
-                Notify("Recall failed. Check the destination before retrying.");
+                Notify("Recall could not complete. Check the clipboard or destination and history access.");
             }
         }
         finally

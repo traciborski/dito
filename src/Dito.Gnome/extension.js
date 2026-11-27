@@ -265,16 +265,23 @@ const HistoryMenu = GObject.registerClass(class DitoHistoryMenu extends PanelMen
 
         const revision = this._previewRevision;
         this._recalling = true;
+        let copied = false;
         try {
             const text = await this._history.send({operation: 'read', id: entry.id},
                 () => revision === this._previewRevision);
             if (revision === this._previewRevision && text !== null) {
                 this._copy(text);
-                this.menu.close();
+                copied = true;
+                await this._history.send({operation: 'promote', id: entry.id});
+                if (revision === this._previewRevision)
+                    this.menu.close();
             }
         } catch {
-            if (revision === this._previewRevision)
-                this._status.text = 'The selected text could not be copied.';
+            if (revision === this._previewRevision) {
+                this._status.text = copied
+                    ? 'Text was copied, but history order could not be updated. Check history access.'
+                    : 'The selected text could not be copied.';
+            }
         } finally {
             this._recalling = false;
         }

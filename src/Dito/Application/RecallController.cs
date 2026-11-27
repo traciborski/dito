@@ -53,21 +53,21 @@ internal sealed class RecallController
 
         cancellationToken.ThrowIfCancellationRequested();
         dismissPopup();
-        if (mode == RecallMode.CopyText)
+        var result = RecallResult.Copied;
+        if (mode != RecallMode.CopyText)
         {
-            return RecallResult.Copied;
+            var pasted = await _paste.TryPasteAsync(
+                target, () => _clipboard.IsCurrentWrite(write.Value), cancellationToken);
+            if (!pasted && !_clipboard.IsCurrentWrite(write.Value))
+            {
+                return RecallResult.ClipboardChanged;
+            }
+
+            result = pasted ? RecallResult.Pasted : RecallResult.ManualPaste;
         }
 
-        var pasted = await _paste.TryPasteAsync(
-            target, () => _clipboard.IsCurrentWrite(write.Value), cancellationToken);
-        if (pasted)
-        {
-            return RecallResult.Pasted;
-        }
-
-        return _clipboard.IsCurrentWrite(write.Value)
-            ? RecallResult.ManualPaste
-            : RecallResult.ClipboardChanged;
+        await _history.PromoteEntryAsync(entryId);
+        return result;
     }
 
     private async Task<ClipboardContent?> LoadContentAsync(

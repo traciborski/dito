@@ -82,6 +82,12 @@ internal static class Program
             return await history.ReadTextAsync(request.Id.Value);
         }
 
+        if (request.Operation == "promote" && request.Id is { } promotedId)
+        {
+            await history.PromoteEntryAsync(promotedId);
+            return null;
+        }
+
         if (request.Operation == "delete" && request.Id is { } deleteId)
         {
             return await history.DeleteEntryAsync(deleteId);
