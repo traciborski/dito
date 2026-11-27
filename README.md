@@ -44,6 +44,24 @@ manual Ctrl+V. If another app changes the clipboard during recall, automatic pas
 is canceled instead of overwriting that newer copy. Opening from the tray may not
 provide a usable target; the keyboard shortcut is the primary recall workflow.
 
+#### Import from the original Ditto
+
+Exit Dito from its tray menu and use a local SQLite backup of the original
+Ditto's `Ditto.db` (or copy the database after exiting Ditto). Back up your Dito
+history before importing. Run this from PowerShell in the directory containing
+`Dito.exe`; piping the output makes PowerShell wait for the desktop executable:
+
+```powershell
+.\Dito.exe --import-from-ditto "C:\Backups\Ditto.db" --dry-run | Out-Host
+```
+
+Remove `--dry-run` to import. The command reports added, duplicate, and skipped
+clip counts without starting the tray app or touching the clipboard. It imports
+Unicode plain text, including clips inside groups, trims surrounding whitespace,
+and leaves existing matching clips unchanged. Clips without Unicode text are
+skipped; group structure, formatting, and other Ditto-specific metadata are not
+carried over.
+
 ### Linux (native X11)
 
 Use a native X11 session (`echo "$XDG_SESSION_TYPE"` should print `x11`).

@@ -50,6 +50,25 @@ public sealed class HistoryStoreTests
     }
 
     [Fact]
+    public async Task ImportRollsBackClipsAndSearchIndexIfReadingFails()
+    {
+        await using var database = new TestDatabase();
+        await database.Store.InitializeAsync();
+        await database.Store.RecordCopyAsync("keep", DateTimeOffset.UtcNow);
+
+        await Assert.ThrowsAsync<IOException>(() => database.Store.ImportAsync(BrokenSource(), dryRun: false));
+
+        Assert.Single((await database.Store.SearchAsync("")).Items);
+        Assert.Empty((await database.Store.SearchAsync("partial")).Items);
+
+        static IEnumerable<(string Text, DateTimeOffset CopiedAt)?> BrokenSource()
+        {
+            yield return ("partial import", DateTimeOffset.UtcNow);
+            throw new IOException();
+        }
+    }
+
+    [Fact]
     public async Task LabelsAreSearchableAndSurviveRecopyAndReopenWithoutChangingText()
     {
         await using var database = new TestDatabase();

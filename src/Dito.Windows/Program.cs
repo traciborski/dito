@@ -10,7 +10,57 @@ namespace Dito;
 internal static class Program
 {
     [STAThread]
-    private static void Main()
+    private static int Main(string[] args)
+    {
+        if (args.Length != 0)
+        {
+            return RunImportCommand(args);
+        }
+
+        RunDesktop();
+        return 0;
+    }
+
+    private static int RunImportCommand(string[] args)
+    {
+        DittoImport.AttachToConsole();
+        if (!DittoImport.TryParse(args, out var sourcePath, out var dryRun))
+        {
+            Console.Error.WriteLine("Usage: Dito.exe --import-from-ditto <backup.db> [--dry-run]");
+            return 2;
+        }
+
+        try
+        {
+            using var instance = AcquireInstance(out var firstInstance);
+            if (!firstInstance)
+            {
+                Console.Error.WriteLine("Exit Dito from its tray menu before importing.");
+                return 1;
+            }
+
+            try
+            {
+                var result = DittoImport.RunAsync(sourcePath, GetHistoryPath(), dryRun).GetAwaiter().GetResult();
+                var action = dryRun ? "Would import" : "Imported";
+                Console.WriteLine($"{action}: {result.Added}; duplicates: {result.Duplicates}; skipped clips: {result.Skipped}.");
+                return 0;
+            }
+            finally
+            {
+                instance.ReleaseMutex();
+            }
+        }
+        catch (Exception)
+        {
+            Console.Error.WriteLine(
+                "Import failed. Check that the source is a readable Ditto database backup, " +
+                "it differs from Dito's history database, and storage is accessible.");
+            return 1;
+        }
+    }
+
+    private static void RunDesktop()
     {
         ApplicationConfiguration.Initialize();
 

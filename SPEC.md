@@ -39,6 +39,16 @@
 - Enter or double-click pastes plain text; Shift+Enter also offers saved HTML/RTF
   alongside plain text. The destination chooses a format. Ctrl+Enter copies plain
   text without pasting. Without a selection, no recall occurs.
+- `Dito.exe --import-from-ditto <backup.db> [--dry-run]` requires the tray app to
+  be closed and runs without starting capture. Read a backup of the original
+  Ditto's SQLite database without writing to it. Import valid `CF_UNICODETEXT`
+  clips (including clips inside groups), trimming surrounding whitespace and
+  skipping empty, malformed, or unsupported clips. Do not copy groups, rich
+  formats, or other Ditto-specific metadata. Use Ditto's creation time for both
+  copy timestamps and add new clips oldest to newest by Ditto's regular
+  `clipOrder`. Skip duplicates without modifying or promoting existing entries.
+  Insert the batch atomically. Dry run reports the same counts without adding
+  entries or creating a missing Dito history database.
 
 ## X11 interaction and capture
 

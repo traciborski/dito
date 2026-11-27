@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Import Unicode text history from a Ditto database backup with the Windows
+  `--import-from-ditto` command, with an optional dry run.
 - Trim surrounding whitespace from new clipboard captures and skip empty results.
   Existing history is unchanged. On Windows, trimmed clips are saved as plain text only.
 - Replace the local Windows build after publishing to a fresh directory, so an

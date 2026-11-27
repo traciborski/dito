@@ -3,6 +3,8 @@ using Microsoft.Data.Sqlite;
 
 namespace Dito.Storage;
 
+internal readonly record struct HistoryImportResult(int Added, int Duplicates, int Skipped);
+
 internal sealed class HistoryStore : IAsyncDisposable
 {
     private const int PageSize = 100;
@@ -66,6 +68,12 @@ internal sealed class HistoryStore : IAsyncDisposable
     public Task<ClipboardContent?> ReadFormattedAsync(long id, CancellationToken cancellationToken = default)
     {
         return RunAsync(() => ReadFormatted(id), cancellationToken);
+    }
+
+    public Task<HistoryImportResult> ImportAsync(
+        IEnumerable<(string Text, DateTimeOffset CopiedAt)?> entries, bool dryRun)
+    {
+        return RunAsync(() => Import(entries, dryRun), CancellationToken.None);
     }
 
     public async ValueTask DisposeAsync()
@@ -254,6 +262,115 @@ internal sealed class HistoryStore : IAsyncDisposable
         command.Parameters.Add("$html", SqliteType.Blob).Value = (object?)content.Html ?? DBNull.Value;
         command.Parameters.Add("$rtf", SqliteType.Blob).Value = (object?)content.Rtf ?? DBNull.Value;
         return (long)command.ExecuteScalar()!;
+    }
+
+    private HistoryImportResult Import(IEnumerable<(string Text, DateTimeOffset CopiedAt)?> entries, bool dryRun)
+    {
+        using var source = entries.GetEnumerator();
+        if (!source.MoveNext())
+        {
+            return new(0, 0, 0);
+        }
+
+        using var preview = File.Exists(_databasePath) ? OpenImportDestinationReadOnly() : null;
+        using var lookup = dryRun ? preview?.CreateCommand() : null;
+        if (lookup is not null)
+        {
+            lookup.CommandText = "SELECT 1 FROM clips WHERE text = $text;";
+            lookup.Parameters.Add("$text", SqliteType.Text);
+        }
+
+        var seen = dryRun ? new HashSet<string>(StringComparer.Ordinal) : null;
+        using var insert = dryRun ? null : CreateImportCommand();
+        using var transaction = insert is null ? null : Connection.BeginTransaction();
+        if (insert is not null)
+        {
+            insert.Transaction = transaction;
+        }
+        var added = 0;
+        var duplicates = 0;
+        var skipped = 0;
+        do
+        {
+            if (source.Current is not { } entry)
+            {
+                skipped++;
+            }
+            else if (insert is not null ? InsertImportEntry(insert, entry) : IsNew(entry.Text, seen!, lookup))
+            {
+                added++;
+            }
+            else
+            {
+                duplicates++;
+            }
+        } while (source.MoveNext());
+
+        transaction?.Commit();
+        return new(added, duplicates, skipped);
+    }
+
+    private SqliteConnection OpenImportDestinationReadOnly()
+    {
+        var connection = new SqliteConnection(new SqliteConnectionStringBuilder
+        {
+            DataSource = _databasePath,
+            Mode = SqliteOpenMode.ReadOnly,
+            DefaultTimeout = 2,
+            Pooling = false
+        }.ToString());
+
+        try
+        {
+            connection.Open();
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT text FROM clips LIMIT 0;";
+            command.ExecuteNonQuery();
+            return connection;
+        }
+        catch
+        {
+            connection.Dispose();
+            throw;
+        }
+    }
+
+    private SqliteCommand CreateImportCommand()
+    {
+        Initialize();
+        var command = Connection.CreateCommand();
+        command.CommandText = """
+            INSERT INTO clips (id, text, first_copied_utc_ms, last_copied_utc_ms, copy_order)
+            SELECT value + 1, $text, $now, $now, value + 1
+            FROM history_sequence WHERE true
+            ON CONFLICT(text) DO NOTHING;
+            """;
+        command.Parameters.Add("$text", SqliteType.Text);
+        command.Parameters.Add("$now", SqliteType.Integer);
+        return command;
+    }
+
+    private static bool InsertImportEntry(SqliteCommand command, (string Text, DateTimeOffset CopiedAt) entry)
+    {
+        command.Parameters["$text"].Value = entry.Text;
+        command.Parameters["$now"].Value = entry.CopiedAt.ToUnixTimeMilliseconds();
+        return command.ExecuteNonQuery() != 0;
+    }
+
+    private static bool IsNew(string text, HashSet<string> seen, SqliteCommand? lookup)
+    {
+        if (!seen.Add(text))
+        {
+            return false;
+        }
+
+        if (lookup is null)
+        {
+            return true;
+        }
+
+        lookup.Parameters["$text"].Value = text;
+        return lookup.ExecuteScalar() is null;
     }
 
     private int PromoteEntry(long id)
