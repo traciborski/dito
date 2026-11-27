@@ -135,8 +135,9 @@ installed Desktop Runtime; to package the runtime, publish with
 
 ### Windows
 
-Run `.\scripts\install.ps1` in PowerShell to stop Dito in your session, publish a slim
-Release build, and start `artifacts\Dito\Dito.exe`. This needs the SDK to build,
+Run `.\scripts\install.ps1` in PowerShell to publish a slim Release build to a fresh
+directory. After a successful publish, it stops Dito in your session, replaces
+`artifacts\Dito`, and starts `Dito.exe` from there. This needs the SDK to build
 and the .NET 10 Desktop Runtime to run. Both local builds and GitHub releases
 bundle SQLite with FTS5; only GitHub releases also bundle .NET.
 The script stops Dito without draining pending captures; use **Exit** in the

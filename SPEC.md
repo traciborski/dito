@@ -18,8 +18,9 @@
   Publish self-contained Windows x64 and Arm64 ZIPs and Linux x64 and Arm64
   tar.gz archives and GNOME extension ZIPs with bundled SQLite and .NET.
   Linux needs system desktop libraries.
-  Local restart builds use the installed .NET Desktop Runtime. See `README.md`
-  for release and development commands.
+  The local Windows installer uses the installed .NET Desktop Runtime and
+  replaces the previous build only after a successful publish to a fresh
+  directory. See `README.md` for release and development commands.
 
 ## Windows interaction
 
